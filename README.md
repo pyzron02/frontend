@@ -1,118 +1,145 @@
-# Trading Strategy Backtester Frontend
+# Trading Strategy Backtester - Frontend
 
-A web-based frontend for the Trading Strategy Backtester.
+A Flask web application that provides a user-friendly interface for the Trading Strategy Backtester framework.
 
-## Overview
+## Features
 
-This frontend provides a user-friendly interface to configure and run backtests using the Trading Strategy Backtester. It allows users to:
-
-- Select a trading strategy
-- Configure parameters for the strategy
-- Select ticker symbols
-- Set date ranges and other backtest settings
-- View results of completed backtests
+- Configure and run backtests through a web interface
+- Visualize backtest results with interactive charts
+- Compare performance of different trading strategies
+- Optimize strategy parameters
+- View detailed metrics and trade statistics
 
 ## Installation
 
-1. Make sure you have Python 3.7+ installed
-2. Install the required dependencies:
+### Prerequisites
+
+- Python 3.8 or higher
+- pip (Python package manager)
+- Access to the Trading Strategy Backtester project
+
+### Setup
+
+1. **Clone the repository**
+
+```bash
+git clone https://github.com/yourusername/trading-strategy-backtester-frontend.git
+cd trading-strategy-backtester-frontend
+```
+
+2. **Create and activate a virtual environment**
+
+```bash
+# On Linux/macOS
+python -m venv venv
+source venv/bin/activate
+
+# On Windows
+python -m venv venv
+venv\Scripts\activate
+```
+
+3. **Install dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the setup script to verify your environment and create necessary directories:
+4. **Configure environment variables**
+
+Copy the template environment file and modify it with your specific settings:
 
 ```bash
-python setup.py
+cp .env.template .env
 ```
 
-## Usage
+Edit the `.env` file to set the correct paths and configuration values:
 
-1. Start the Flask application:
+```
+# Set the path to your trading-strategy-backtester installation
+BACKTESTER_ROOT=/path/to/trading-strategy-backtester
+BACKTESTER_OUTPUT_DIR=/path/to/trading-strategy-backtester/output
+```
+
+5. **Configure application settings**
+
+Copy the template configuration file:
+
+```bash
+cp config.template.json config.json
+```
+
+Edit `config.json` to customize the application settings.
+
+## Running the Application
+
+Start the Flask development server:
+
+```bash
+flask run
+```
+
+Or run it directly:
 
 ```bash
 python app.py
 ```
 
-2. Open a web browser and navigate to:
+Access the application in your web browser at http://localhost:5000
 
-```
-http://localhost:5000
-```
+## Development
 
-3. Configure your backtest:
-   - Select a strategy from the dropdown
-   - Enter comma-separated ticker symbols (e.g., AAPL,MSFT,GOOG)
-   - Set the date range for backtesting
-   - Adjust the in-sample ratio and other parameters
-   - Configure strategy-specific parameters
+### Project Structure
 
-4. Click the "Run Backtest" button to start the backtest
-5. Check the "Results" page to view the status and results of your backtests
+- `app.py` - Main Flask application
+- `templates/` - HTML templates
+- `static/` - CSS, JavaScript, and other static assets
+- `run_backtest.py` - Script to run backtests in the background
+- `config.json` - Application configuration
 
-## Architecture
+### Adding a New Feature
 
-The frontend consists of:
+1. Create a feature branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-- Flask web application (`app.py`)
-- HTML templates for the user interface (`templates/`)
-- Command-line script for running backtests (`run_backtest.py`)
+2. Implement your changes
+3. Test thoroughly
+4. Submit a pull request
 
-Backtests are run in a separate process to avoid blocking the web interface. The Flask app tracks the status of running backtests and displays results when they're complete.
+## Testing
 
-## Folder Structure
+Run the test suite:
 
-```
-frontend/
-├── app.py                  # Main Flask application
-├── run_backtest.py         # Script for running backtests
-├── setup.py                # Environment setup script
-├── requirements.txt        # Python dependencies
-├── README.md               # This file
-├── static/                 # Static assets (CSS, JS, images)
-├── templates/              # HTML templates
-│   ├── index.html          # Main page
-│   └── results.html        # Results page
-└── temp/                   # Temporary files for backtest configuration
+```bash
+python -m pytest
 ```
 
-## How It Works
+For a specific test file:
 
-1. User configures a backtest through the web interface
-2. Configuration is saved to a temporary JSON file
-3. A background process runs the backtest using the unified workflow
-4. Results are saved to the output directory
-5. The web interface displays the status and results
+```bash
+python -m pytest test_strategy.py
+```
 
-This architecture allows multiple backtests to run simultaneously without blocking the user interface.
+## Deployment
 
-## Troubleshooting
+For production deployment:
 
-### Import Errors
+1. Set `FLASK_ENV=production` in your `.env` file
+2. Use a production WSGI server like Gunicorn:
+   ```bash
+   pip install gunicorn
+   gunicorn -w 4 app:app
+   ```
 
-If you encounter import errors related to the `strategies` module, this is likely due to Python's module resolution. The setup script should address this, but if problems persist, ensure:
+3. Consider using a reverse proxy like Nginx to handle static files and SSL
 
-1. The trading-strategy-backtester directory is at `/home/pyzron02/trading-strategy-backtester`
-2. The correct paths are added to Python's sys.path
+## License
 
-### Process Errors
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-If backtests fail to start or complete:
+## Acknowledgments
 
-1. Check the log files in the `/home/pyzron02/frontend/temp` directory
-2. Ensure the backtester code is functioning by running a simple test directly
-3. Look for error messages in the terminal where you started the Flask application
-
-### Directory Access
-
-If you encounter permission errors:
-
-1. Ensure you have write access to both the frontend and backtester directories
-2. Run `python setup.py` to create any missing directories
-
-## Notes
-
-- Backtests can take a significant amount of time to complete, especially with Monte Carlo simulations
-- You can monitor the status of running backtests on the "Results" page
-- Results are stored in the `/home/pyzron02/trading-strategy-backtester/output` directory 
+- Built for the Trading Strategy Backtester framework
+- Utilizes Flask, Bootstrap, and Chart.js 

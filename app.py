@@ -12,9 +12,13 @@ import math
 import re
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 # Add the trading-strategy-backtester to the path
-project_root = '/home/pyzron02/trading-strategy-backtester'
+project_root = os.getenv('BACKTESTER_ROOT', '/home/pyzron02/trading-strategy-backtester')
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, 'src'))
 
@@ -89,13 +93,13 @@ class SafeJSONEncoder(json.JSONEncoder):
 json._default_encoder = SafeJSONEncoder()
 
 app = Flask(__name__)
-app.secret_key = 'trading_strategy_backtester_secret_key'
+app.secret_key = os.getenv('SECRET_KEY', 'trading_strategy_backtester_secret_key')
 
-# Default parameters
-DEFAULT_START_DATE = '2015-01-01'
-DEFAULT_END_DATE = '2021-12-31'
-DEFAULT_IN_SAMPLE_RATIO = 0.7
-DEFAULT_NUM_SIMULATIONS = 1000
+# Default parameters from environment variables
+DEFAULT_START_DATE = os.getenv('DEFAULT_START_DATE', '2015-01-01')
+DEFAULT_END_DATE = os.getenv('DEFAULT_END_DATE', '2021-12-31')
+DEFAULT_IN_SAMPLE_RATIO = float(os.getenv('DEFAULT_IN_SAMPLE_RATIO', '0.7'))
+DEFAULT_NUM_SIMULATIONS = int(os.getenv('DEFAULT_NUM_SIMULATIONS', '1000'))
 
 # Track running backtests
 RUNNING_BACKTESTS = {}
@@ -349,11 +353,13 @@ def submit_backtest():
         
         # Create a timestamp for the output directory
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        output_dir = os.path.join('/home/pyzron02/trading-strategy-backtester/output', 
-                                 f"{strategy_name}_{timestamp}")
+        output_dir = os.path.join(
+            os.getenv('BACKTESTER_OUTPUT_DIR', '/home/pyzron02/trading-strategy-backtester/output'), 
+            f"{strategy_name}_{timestamp}")
         
         # Create temp directories if they don't exist
-        os.makedirs('/home/pyzron02/frontend/temp', exist_ok=True)
+        temp_dir = os.getenv('TEMP_DIR', '/home/pyzron02/frontend/temp')
+        os.makedirs(temp_dir, exist_ok=True)
         os.makedirs(os.path.dirname(output_dir), exist_ok=True)
         
         # Generate configuration
@@ -379,7 +385,7 @@ def submit_backtest():
             print(f"Parameter grid created: {param_grid}")
             
             # Create a parameter file
-            param_file = os.path.join('/home/pyzron02/frontend/temp', f"params_{timestamp}.json")
+            param_file = os.path.join(temp_dir, f"params_{timestamp}.json")
             with open(param_file, 'w') as f:
                 json.dump({'parameters': param_grid}, f, indent=4)
                 
@@ -404,7 +410,7 @@ def submit_backtest():
             print(f"Single parameter values: {param_values}")
         
         # Create a config file for the run_backtest.py script
-        config_file = os.path.join('/home/pyzron02/frontend/temp', f"config_{timestamp}.json")
+        config_file = os.path.join(temp_dir, f"config_{timestamp}.json")
         with open(config_file, 'w') as f:
             json.dump(config, f, indent=4)
         
@@ -414,7 +420,7 @@ def submit_backtest():
         python_path = sys.executable  # Get the current Python executable
         run_backtest_script = os.path.abspath('/home/pyzron02/frontend/run_backtest.py')
         
-        log_file = os.path.join('/home/pyzron02/frontend/temp', f"backtest_{timestamp}.log")
+        log_file = os.path.join(temp_dir, f"backtest_{timestamp}.log")
         with open(log_file, 'w') as log:
             # Set up environment with correct paths
             env = dict(os.environ)
@@ -456,7 +462,7 @@ def submit_backtest():
 @app.route('/results')
 def list_results():
     """List all available backtest results with enhanced metrics."""
-    results_dir = '/home/pyzron02/trading-strategy-backtester/output'
+    results_dir = os.getenv('BACKTESTER_OUTPUT_DIR', '/home/pyzron02/trading-strategy-backtester/output')
     
     # Use a simpler approach with only primitive data types
     # This ensures we avoid any serialization issues with complex objects
@@ -813,15 +819,17 @@ def run_backtest():
         
         # Create a timestamp for the output directory
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        output_dir = os.path.join('/home/pyzron02/trading-strategy-backtester/output', 
-                                 f"{strategy_name}_{timestamp}")
+        output_dir = os.path.join(
+            os.getenv('BACKTESTER_OUTPUT_DIR', '/home/pyzron02/trading-strategy-backtester/output'), 
+            f"{strategy_name}_{timestamp}")
         
         # Create temp directories if they don't exist
-        os.makedirs('/home/pyzron02/frontend/temp', exist_ok=True)
+        temp_dir = os.getenv('TEMP_DIR', '/home/pyzron02/frontend/temp')
+        os.makedirs(temp_dir, exist_ok=True)
         os.makedirs(os.path.dirname(output_dir), exist_ok=True)
         
         # Create a config file for the run_backtest.py script
-        config_file = os.path.join('/home/pyzron02/frontend/temp', f"config_{timestamp}.json")
+        config_file = os.path.join(temp_dir, f"config_{timestamp}.json")
         config = {
             'strategy_name': strategy_name,
             'tickers': tickers,
@@ -841,7 +849,7 @@ def run_backtest():
             json.dump(config, f, indent=4)
         
         # Run the backtest script in a background process
-        log_file = os.path.join('/home/pyzron02/frontend/temp', f"backtest_{timestamp}.log")
+        log_file = os.path.join(temp_dir, f"backtest_{timestamp}.log")
         with open(log_file, 'w') as log:
             process = subprocess.Popen(
                 [sys.executable, '/home/pyzron02/frontend/run_backtest.py', '--config', config_file],
