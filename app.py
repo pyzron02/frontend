@@ -12,10 +12,19 @@ import math
 import re
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from dotenv import load_dotenv
 
-# Load environment variables from .env file if it exists
-load_dotenv()
+# Try to import dotenv, gracefully handle if not installed
+try:
+    from dotenv import load_dotenv
+    # Load environment variables from .env file if it exists
+    load_dotenv()
+except ImportError:
+    # Define a dummy function if python-dotenv is not installed
+    def load_dotenv():
+        print("Warning: python-dotenv package not installed. Environment variables from .env file will not be loaded.")
+        pass
+    # Ensure the function is called for consistent behavior
+    load_dotenv()
 
 # Add the trading-strategy-backtester to the path
 project_root = os.getenv('BACKTESTER_ROOT', '/home/pyzron02/trading-strategy-backtester')
