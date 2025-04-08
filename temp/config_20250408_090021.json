@@ -1,0 +1,19 @@
+{
+    "strategy_name": "SimpleStock",
+    "tickers": [
+        "AAPL"
+    ],
+    "start_date": "2020-01-01",
+    "end_date": "2024-12-31",
+    "in_sample_ratio": 0.7,
+    "num_simulations": 10,
+    "num_workers": 7,
+    "verbose": true,
+    "keep_permuted_data": true,
+    "params": {
+        "position_size": 100,
+        "sma_period": 10
+    },
+    "output_dir": "/home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_090021",
+    "timestamp": "20250408_090021"
+}

@@ -1,0 +1,21 @@
+{
+    "strategy_name": "MultiPosition",
+    "tickers": [
+        "AAPL"
+    ],
+    "start_date": "2020-01-01",
+    "end_date": "2025-04-07",
+    "in_sample_ratio": 0.7,
+    "num_simulations": 1000,
+    "num_workers": 7,
+    "verbose": false,
+    "keep_permuted_data": true,
+    "run_optimization": false,
+    "output_dir": "/home/pyzron02/trading-strategy-backtester/output/MultiPosition_20250408_090938",
+    "timestamp": "20250408_090938",
+    "params": {
+        "max_positions": 5,
+        "position_size": 50,
+        "sma_period": 20
+    }
+}

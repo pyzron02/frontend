@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Strategy Backtester</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        body {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        .parameter-fields {
+            margin-top: 20px;
+        }
+        .card {
+            margin-bottom: 20px;
+        }
+        .alert-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .tab-content {
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="pb-3 mb-4 border-bottom">
+            <h1 class="display-5 fw-bold">Trading Strategy Backtester</h1>
+        </header>
+
+        <div class="alert-container">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Configure Backtest</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="backtest-form" action="{{ url_for('submit_backtest') }}" method="post">
+                            <div class="mb-3">
+                                <label for="strategy" class="form-label">Trading Strategy</label>
+                                <select class="form-select" id="strategy" name="strategy" required>
+                                    <option value="" disabled selected>Select a strategy</option>
+                                    {% for strategy in strategies %}
+                                    <option value="{{ strategy.name }}">{{ strategy.name }} (v{{ strategy.version }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="tickers" class="form-label">Tickers (comma-separated)</label>
+                                <input type="text" class="form-control" id="tickers" name="tickers" placeholder="e.g. AAPL,MSFT,GOOG" required>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="start_date" class="form-label">Start Date</label>
+                                    <input type="text" class="form-control datepicker" id="start_date" name="start_date" value="{{ default_start_date }}" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="end_date" class="form-label">End Date</label>
+                                    <input type="text" class="form-control datepicker" id="end_date" name="end_date" value="{{ default_end_date }}" required>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="in_sample_ratio" class="form-label">In-Sample Ratio (0.0-1.0)</label>
+                                    <input type="number" class="form-control" id="in_sample_ratio" name="in_sample_ratio" value="{{ default_in_sample_ratio }}" min="0.1" max="0.9" step="0.1" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="num_simulations" class="form-label">Monte Carlo Simulations</label>
+                                    <input type="number" class="form-control" id="num_simulations" name="num_simulations" value="{{ default_num_simulations }}" min="0" max="10000" required>
+                                    <small class="text-muted">Set to 0 to skip Monte Carlo testing</small>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="num_workers" class="form-label">Number of CPU Workers</label>
+                                    <input type="number" class="form-control" id="num_workers" name="num_workers" value="1" min="1" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mt-4">
+                                        <input type="checkbox" class="form-check-input" id="run_optimization" name="run_optimization">
+                                        <label class="form-check-label" for="run_optimization">Run Parameter Optimization</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="verbose" name="verbose">
+                                <label class="form-check-label" for="verbose">Verbose Output</label>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="keep_permuted_data" name="keep_permuted_data">
+                                <label class="form-check-label" for="keep_permuted_data">Keep Permuted Data Files</label>
+                            </div>
+
+                            <h5 class="mt-4">Strategy Parameters</h5>
+                            
+                            <ul class="nav nav-tabs" id="paramTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#single-params" type="button" role="tab" aria-controls="single-params" aria-selected="true">Single Values</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="grid-tab" data-bs-toggle="tab" data-bs-target="#grid-params" type="button" role="tab" aria-controls="grid-params" aria-selected="false">Parameter Grid</button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content" id="paramTabsContent">
+                                <div class="tab-pane fade show active" id="single-params" role="tabpanel" aria-labelledby="single-tab">
+                                    <div id="parameter-fields" class="parameter-fields">
+                                        <p class="text-muted">Please select a strategy to see available parameters</p>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="grid-params" role="tabpanel" aria-labelledby="grid-tab">
+                                    <div id="parameter-grid-fields" class="parameter-fields">
+                                        <p class="text-muted">Please select a strategy to see available parameters for optimization</p>
+                                    </div>
+                                    <div class="form-text text-muted mb-3">
+                                        Specify parameter ranges for optimization. The system will try combinations of these parameters to find the best performing strategy.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary mt-3">Run Backtest</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Recent Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>View previously completed backtests:</p>
+                        <a href="{{ url_for('list_results') }}" class="btn btn-outline-primary">View Results</a>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5>Documentation</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Available Strategies:</h6>
+                        <ul>
+                            {% for strategy in strategies %}
+                            <li><strong>{{ strategy.name }}</strong> (v{{ strategy.version }})</li>
+                            {% endfor %}
+                        </ul>
+                        <hr>
+                        <p>The complete workflow includes:</p>
+                        <ol>
+                            <li>In-sample optimization</li>
+                            <li>Walk-forward testing</li>
+                            <li>Monte Carlo simulation (optional)</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize date pickers
+            flatpickr(".datepicker", {
+                dateFormat: "Y-m-d"
+            });
+            
+            // Strategy selector
+            const strategySelect = document.getElementById('strategy');
+            strategySelect.addEventListener('change', function() {
+                const strategyName = this.value;
+                if (strategyName) {
+                    fetchStrategyParameters(strategyName);
+                }
+            });
+            
+            // Fetch strategy parameters
+            function fetchStrategyParameters(strategyName) {
+                fetch(`/strategy/${strategyName}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateParameterFields(data.params);
+                            updateParameterGridFields(data.params);
+                        } else {
+                            console.error('Error fetching strategy parameters:', data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+            }
+            
+            // Update parameter fields in the form (single values)
+            function updateParameterFields(params) {
+                const parameterFields = document.getElementById('parameter-fields');
+                parameterFields.innerHTML = '';
+                
+                for (const [paramName, defaultValue] of Object.entries(params)) {
+                    const row = document.createElement('div');
+                    row.className = 'row mb-3';
+                    
+                    const col = document.createElement('div');
+                    col.className = 'col-md-6';
+                    
+                    const label = document.createElement('label');
+                    label.className = 'form-label';
+                    label.htmlFor = `param_${paramName}`;
+                    label.textContent = paramName;
+                    
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'form-control';
+                    input.id = `param_${paramName}`;
+                    input.name = `param_${paramName}`;
+                    input.value = defaultValue;
+                    
+                    col.appendChild(label);
+                    col.appendChild(input);
+                    row.appendChild(col);
+                    parameterFields.appendChild(row);
+                }
+            }
+            
+            // Update parameter grid fields (min/max/step for optimization)
+            function updateParameterGridFields(params) {
+                const parameterGridFields = document.getElementById('parameter-grid-fields');
+                parameterGridFields.innerHTML = '';
+                
+                for (const [paramName, defaultValue] of Object.entries(params)) {
+                    const row = document.createElement('div');
+                    row.className = 'mb-4';
+                    
+                    const header = document.createElement('h6');
+                    header.textContent = paramName;
+                    
+                    const gridRow = document.createElement('div');
+                    gridRow.className = 'row g-3';
+                    
+                    // Min column
+                    const minCol = document.createElement('div');
+                    minCol.className = 'col-md-4';
+                    
+                    const minLabel = document.createElement('label');
+                    minLabel.className = 'form-label';
+                    minLabel.htmlFor = `grid_${paramName}_min`;
+                    minLabel.textContent = 'Min';
+                    
+                    const minInput = document.createElement('input');
+                    minInput.type = 'number';
+                    minInput.className = 'form-control';
+                    minInput.id = `grid_${paramName}_min`;
+                    minInput.name = `grid_${paramName}_min`;
+                    minInput.value = typeof defaultValue === 'number' ? Math.max(1, defaultValue - 10) : '';
+                    
+                    minCol.appendChild(minLabel);
+                    minCol.appendChild(minInput);
+                    
+                    // Max column
+                    const maxCol = document.createElement('div');
+                    maxCol.className = 'col-md-4';
+                    
+                    const maxLabel = document.createElement('label');
+                    maxLabel.className = 'form-label';
+                    maxLabel.htmlFor = `grid_${paramName}_max`;
+                    maxLabel.textContent = 'Max';
+                    
+                    const maxInput = document.createElement('input');
+                    maxInput.type = 'number';
+                    maxInput.className = 'form-control';
+                    maxInput.id = `grid_${paramName}_max`;
+                    maxInput.name = `grid_${paramName}_max`;
+                    maxInput.value = typeof defaultValue === 'number' ? defaultValue + 10 : '';
+                    
+                    maxCol.appendChild(maxLabel);
+                    maxCol.appendChild(maxInput);
+                    
+                    // Step column
+                    const stepCol = document.createElement('div');
+                    stepCol.className = 'col-md-4';
+                    
+                    const stepLabel = document.createElement('label');
+                    stepLabel.className = 'form-label';
+                    stepLabel.htmlFor = `grid_${paramName}_step`;
+                    stepLabel.textContent = 'Step';
+                    
+                    const stepInput = document.createElement('input');
+                    stepInput.type = 'number';
+                    stepInput.className = 'form-control';
+                    stepInput.id = `grid_${paramName}_step`;
+                    stepInput.name = `grid_${paramName}_step`;
+                    stepInput.value = typeof defaultValue === 'number' ? '1' : '';
+                    stepInput.min = '0.01';
+                    stepInput.step = '0.01';
+                    
+                    stepCol.appendChild(stepLabel);
+                    stepCol.appendChild(stepInput);
+                    
+                    // Add all columns to grid row
+                    gridRow.appendChild(minCol);
+                    gridRow.appendChild(maxCol);
+                    gridRow.appendChild(stepCol);
+                    
+                    // Add header and grid row to main row
+                    row.appendChild(header);
+                    row.appendChild(gridRow);
+                    
+                    // Add to parameter grid fields
+                    parameterGridFields.appendChild(row);
+                }
+            }
+            
+            // Auto-dismiss flash messages after 5 seconds
+            setTimeout(function() {
+                const alerts = document.querySelectorAll('.alert');
+                alerts.forEach(alert => {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                });
+            }, 5000);
+            
+            // Toggle between parameter tabs based on optimization checkbox
+            const optimizationCheckbox = document.getElementById('run_optimization');
+            const singleTab = document.getElementById('single-tab');
+            const gridTab = document.getElementById('grid-tab');
+            
+            optimizationCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    gridTab.click();
+                } else {
+                    singleTab.click();
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
