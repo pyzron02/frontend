@@ -1,82 +1,0 @@
-22:04:33 - backtester - INFO - Logging system initialized with default level: INFO
-22:04:33 - backtester - INFO - Log directory: /home/pyzron02/trading-strategy-backtester/logs
-22:04:33 - backtester - INFO - Console output: True
-22:04:33 - backtester - INFO - File output: True
-22:04:33 - backtester - INFO - Async logging: True
-22:04:33 - backtester - INFO - Async logging thread started
-Registered strategy: SimpleStock (v1.0.1)
-Registered strategy: MultiPosition (v1.0.1)
-Registered strategy: AuctionMarket (v1.0.1)
-Registered strategy: MACrossover (v1.0.0)
-Starting backtest for strategy: SimpleStock
-Tickers: ['TSLA', 'PLTR', 'NVDA']
-Date range: 2020-01-01 to 2024-12-31
-Output directory: /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431
-Registered strategy: SimpleStock (v1.0.1)
-Registered strategy: MultiPosition (v1.0.1)
-Registered strategy: AuctionMarket (v1.0.1)
-Registered strategy: MACrossover (v1.0.0)
-Found strategy class: SimpleStockStrategy
-Running with fixed parameters
-Parameters formatted for optimization: /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/parameters.json
-Running backtest | 22:04:35 - backtester - INFO - Set log level for all components to INFO
-22:04:35 - backtester.workflow - INFO - Starting complete workflow for SimpleStock
-22:04:35 - backtester.workflow - INFO - Tickers: ['TSLA', 'PLTR', 'NVDA']
-22:04:35 - backtester.workflow - INFO - Period: 2020-01-01 to 2024-12-31
-22:04:35 - backtester.workflow - INFO - Output directory: /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431
-22:04:35 - backtester.workflow - INFO - Parameter grid after normalization: {'position_size': [100], 'sma_period': [20]}
-22:04:35 - backtester.workflow - WARNING - Could not copy parameter file: '/home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/parameters.json' and '/home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/parameters.json' are the same file
-22:04:35 - backtester.workflow - INFO - In-sample period: 2020-01-01 to 2023-07-02
-22:04:35 - backtester.workflow - INFO - Out-of-sample period: 2023-07-03 to 2024-12-31
-22:04:35 - backtester.workflow - INFO - Starting in-sample optimization...
-22:04:35 - backtester.workflow - INFO - Using 7 CPU cores for parallel optimization
-Testing parameters:   0%|          | 0/1 [00:00<?, ?it/s]Testing parameters: 100%|██████████| 1/1 [00:01<00:00,  1.09s/it]Testing parameters: 100%|██████████| 1/1 [00:01<00:00,  1.11s/it]
-22:04:36 - backtester.in_sample - INFO - Best parameters saved to /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/optimization/best_parameters.txt and /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/optimization/parameters.txt
-22:04:36 - backtester.workflow - INFO - Optimization process output captured in /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/logs/optimization_output.log
-22:04:36 - backtester.workflow - INFO - Best parameters found: {'position_size': 100, 'sma_period': 20}
-22:04:36 - backtester.workflow - INFO - Copied parameters.txt from optimization directory to main output directory
-22:04:36 - backtester.workflow - INFO - Starting walk-forward testing...
-22:04:39 - backtester.workflow - INFO - Walk-forward process output captured in /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/logs/walkforward_output.log
-22:04:39 - backtester.workflow - INFO - Walk-forward testing completed
-22:04:39 - backtester.workflow - INFO - Starting Trade-Based Monte Carlo testing with 100 simulations using 7 workers...
-22:04:39 - backtester.workflow - INFO - Date ranges: In-sample: 2020-01-01 to 2023-12-31, Out-of-sample: 2024-01-01 to 2024-12-31
-22:04:39 - backtester.workflow - INFO - Using 7 CPU cores for Monte Carlo simulations
-22:04:39 - backtester.workflow - INFO - Using Trade-Based Monte Carlo implementation
-22:04:39 - backtester.workflow - INFO - Running 100 simulations with resampled trade returns
-22:04:39 - backtester.workflow - INFO - Using 7 CPU cores for parallel processing
-22:04:39 - backtester.workflow - INFO - Initialized Trade-Based Monte Carlo Test for SimpleStock strategy
-22:04:39 - backtester.workflow - INFO - Parameters: {'position_size': 100, 'sma_period': 20}
-22:04:39 - backtester.workflow - INFO - Tickers: ['TSLA', 'PLTR', 'NVDA']
-22:04:39 - backtester.workflow - INFO - Number of simulations: 100
-22:04:39 - backtester.workflow - INFO - Using 7 CPU cores for parallel processing
-22:04:39 - backtester.workflow - INFO - Keep permuted data: True (This will save permuted data files)
-22:04:39 - backtester.workflow - INFO - Permuted data will be saved in: /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/monte_carlo/permuted_data
-Creating permuted datasets:   0%|          | 0/100 [00:00<?, ?dataset/s]Creating permuted datasets:   1%|          | 1/100 [00:00<00:12,  8.10dataset/s]Creating permuted datasets:   3%|▎         | 3/100 [00:00<00:09, 10.45dataset/s]Creating permuted datasets:   5%|▌         | 5/100 [00:00<00:09,  9.96dataset/s]Creating permuted datasets:   6%|▌         | 6/100 [00:00<00:09,  9.87dataset/s]Creating permuted datasets:   8%|▊         | 8/100 [00:00<00:09, 10.15dataset/s]Creating permuted datasets:  10%|█         | 10/100 [00:00<00:07, 11.49dataset/s]Creating permuted datasets:  12%|█▏        | 12/100 [00:01<00:07, 11.99dataset/s]Creating permuted datasets:  14%|█▍        | 14/100 [00:01<00:07, 11.42dataset/s]Creating permuted datasets:  16%|█▌        | 16/100 [00:01<00:08,  9.61dataset/s]Creating permuted datasets:  18%|█▊        | 18/100 [00:01<00:08,  9.66dataset/s]Creating permuted datasets:  20%|██        | 20/100 [00:01<00:08,  9.66dataset/s]Creating permuted datasets:  22%|██▏       | 22/100 [00:02<00:07, 10.51dataset/s]Creating permuted datasets:  24%|██▍       | 24/100 [00:02<00:06, 11.66dataset/s]Creating permuted datasets:  26%|██▌       | 26/100 [00:02<00:06, 11.86dataset/s]Creating permuted datasets:  28%|██▊       | 28/100 [00:02<00:06, 11.91dataset/s]Creating permuted datasets:  30%|███       | 30/100 [00:02<00:05, 12.03dataset/s]Creating permuted datasets:  32%|███▏      | 32/100 [00:03<00:06,  9.79dataset/s]Creating permuted datasets:  34%|███▍      | 34/100 [00:03<00:06,  9.68dataset/s]Creating permuted datasets:  36%|███▌      | 36/100 [00:03<00:06, 10.56dataset/s]Creating permuted datasets:  38%|███▊      | 38/100 [00:03<00:05, 11.38dataset/s]Creating permuted datasets:  40%|████      | 40/100 [00:03<00:04, 12.13dataset/s]Creating permuted datasets:  42%|████▏     | 42/100 [00:03<00:04, 12.33dataset/s]Creating permuted datasets:  44%|████▍     | 44/100 [00:04<00:05, 10.94dataset/s]Creating permuted datasets:  46%|████▌     | 46/100 [00:04<00:06,  7.93dataset/s]Creating permuted datasets:  48%|████▊     | 48/100 [00:04<00:07,  7.03dataset/s]Creating permuted datasets:  49%|████▉     | 49/100 [00:05<00:09,  5.14dataset/s]Creating permuted datasets:  50%|█████     | 50/100 [00:05<00:10,  4.94dataset/s]Creating permuted datasets:  51%|█████     | 51/100 [00:05<00:09,  5.34dataset/s]Creating permuted datasets:  52%|█████▏    | 52/100 [00:05<00:08,  5.83dataset/s]Creating permuted datasets:  53%|█████▎    | 53/100 [00:05<00:07,  6.31dataset/s]Creating permuted datasets:  54%|█████▍    | 54/100 [00:06<00:07,  6.34dataset/s]Creating permuted datasets:  55%|█████▌    | 55/100 [00:06<00:07,  6.26dataset/s]Creating permuted datasets:  56%|█████▌    | 56/100 [00:06<00:06,  6.85dataset/s]Creating permuted datasets:  58%|█████▊    | 58/100 [00:06<00:05,  8.34dataset/s]Creating permuted datasets:  60%|██████    | 60/100 [00:06<00:04,  9.13dataset/s]Creating permuted datasets:  62%|██████▏   | 62/100 [00:06<00:03,  9.92dataset/s]Creating permuted datasets:  64%|██████▍   | 64/100 [00:07<00:03, 10.59dataset/s]Creating permuted datasets:  66%|██████▌   | 66/100 [00:07<00:03,  9.98dataset/s]Creating permuted datasets:  68%|██████▊   | 68/100 [00:07<00:03,  9.10dataset/s]Creating permuted datasets:  69%|██████▉   | 69/100 [00:07<00:04,  7.12dataset/s]Creating permuted datasets:  70%|███████   | 70/100 [00:07<00:04,  7.28dataset/s]Creating permuted datasets:  72%|███████▏  | 72/100 [00:08<00:03,  8.57dataset/s]Creating permuted datasets:  74%|███████▍  | 74/100 [00:08<00:02,  9.96dataset/s]Creating permuted datasets:  76%|███████▌  | 76/100 [00:08<00:02, 10.86dataset/s]Creating permuted datasets:  78%|███████▊  | 78/100 [00:08<00:01, 11.01dataset/s]Creating permuted datasets:  80%|████████  | 80/100 [00:08<00:01, 10.85dataset/s]Creating permuted datasets:  82%|████████▏ | 82/100 [00:08<00:01,  9.90dataset/s]Creating permuted datasets:  84%|████████▍ | 84/100 [00:09<00:01, 10.38dataset/s]Creating permuted datasets:  86%|████████▌ | 86/100 [00:09<00:01, 10.50dataset/s]Creating permuted datasets:  88%|████████▊ | 88/100 [00:09<00:01, 11.15dataset/s]Creating permuted datasets:  90%|█████████ | 90/100 [00:09<00:00, 11.48dataset/s]Creating permuted datasets:  92%|█████████▏| 92/100 [00:09<00:00, 11.48dataset/s]Creating permuted datasets:  94%|█████████▍| 94/100 [00:09<00:00, 11.51dataset/s]Creating permuted datasets:  96%|█████████▌| 96/100 [00:10<00:00, 11.91dataset/s]Creating permuted datasets:  98%|█████████▊| 98/100 [00:10<00:00,  9.96dataset/s]Creating permuted datasets: 100%|██████████| 100/100 [00:10<00:00,  9.69dataset/s]Creating permuted datasets: 100%|██████████| 100/100 [00:10<00:00,  9.40dataset/s]
-Running backtests:   0%|          | 0/100 [00:00<?, ?backtest/s]Running backtests:   1%|          | 1/100 [00:00<01:32,  1.07backtest/s]Running backtests:   8%|▊         | 8/100 [00:02<00:21,  4.30backtest/s]Running backtests:  13%|█▎        | 13/100 [00:02<00:11,  7.59backtest/s]Running backtests:  16%|█▌        | 16/100 [00:03<00:16,  5.11backtest/s]Running backtests:  22%|██▏       | 22/100 [00:03<00:11,  6.58backtest/s]Running backtests:  24%|██▍       | 24/100 [00:04<00:11,  6.78backtest/s]Running backtests:  26%|██▌       | 26/100 [00:04<00:10,  7.05backtest/s]Running backtests:  29%|██▉       | 29/100 [00:05<00:12,  5.65backtest/s]Running backtests:  31%|███       | 31/100 [00:05<00:11,  6.21backtest/s]Running backtests:  33%|███▎      | 33/100 [00:05<00:11,  5.67backtest/s]Running backtests:  36%|███▌      | 36/100 [00:05<00:08,  7.20backtest/s]Running backtests:  38%|███▊      | 38/100 [00:06<00:07,  7.99backtest/s]Running backtests:  40%|████      | 40/100 [00:06<00:08,  7.35backtest/s]Running backtests:  42%|████▏     | 42/100 [00:06<00:06,  8.35backtest/s]Running backtests:  44%|████▍     | 44/100 [00:06<00:06,  8.02backtest/s]Running backtests:  45%|████▌     | 45/100 [00:07<00:06,  8.07backtest/s]Running backtests:  47%|████▋     | 47/100 [00:07<00:07,  6.75backtest/s]Running backtests:  49%|████▉     | 49/100 [00:07<00:06,  7.55backtest/s]Running backtests:  51%|█████     | 51/100 [00:07<00:06,  7.13backtest/s]Running backtests:  54%|█████▍    | 54/100 [00:08<00:05,  8.28backtest/s]Running backtests:  56%|█████▌    | 56/100 [00:08<00:04,  9.11backtest/s]Running backtests:  58%|█████▊    | 58/100 [00:08<00:04,  8.72backtest/s]Running backtests:  60%|██████    | 60/100 [00:08<00:04,  9.05backtest/s]Running backtests:  61%|██████    | 61/100 [00:09<00:07,  5.29backtest/s]Running backtests:  65%|██████▌   | 65/100 [00:09<00:04,  7.98backtest/s]Running backtests:  67%|██████▋   | 67/100 [00:09<00:03,  8.73backtest/s]Running backtests:  69%|██████▉   | 69/100 [00:10<00:03,  8.06backtest/s]Running backtests:  70%|███████   | 70/100 [00:10<00:04,  7.26backtest/s]Running backtests:  72%|███████▏  | 72/100 [00:10<00:03,  8.46backtest/s]Running backtests:  73%|███████▎  | 73/100 [00:10<00:03,  8.27backtest/s]Running backtests:  74%|███████▍  | 74/100 [00:10<00:04,  6.43backtest/s]Running backtests:  76%|███████▌  | 76/100 [00:11<00:02,  8.10backtest/s]Running backtests:  77%|███████▋  | 77/100 [00:11<00:04,  4.81backtest/s]Running backtests:  80%|████████  | 80/100 [00:11<00:03,  6.23backtest/s]Running backtests:  81%|████████  | 81/100 [00:12<00:04,  4.12backtest/s]Running backtests:  84%|████████▍ | 84/100 [00:12<00:02,  6.01backtest/s]Running backtests:  85%|████████▌ | 85/100 [00:12<00:02,  5.16backtest/s]Running backtests:  87%|████████▋ | 87/100 [00:13<00:02,  4.92backtest/s]Running backtests:  90%|█████████ | 90/100 [00:14<00:01,  5.06backtest/s]Running backtests:  93%|█████████▎| 93/100 [00:14<00:01,  5.09backtest/s]Running backtests:  97%|█████████▋| 97/100 [00:14<00:00,  6.68backtest/s]Running backtests:  99%|█████████▉| 99/100 [00:15<00:00,  7.85backtest/s]Running backtests: 100%|██████████| 100/100 [00:15<00:00,  6.63backtest/s]
-Processing results:   0%|          | 0/100 [00:00<?, ?simulation/s]Processing results:  26%|██▌       | 26/100 [00:00<00:00, 259.18simulation/s]Processing results:  57%|█████▋    | 57/100 [00:00<00:00, 284.44simulation/s]Processing results:  90%|█████████ | 90/100 [00:00<00:00, 301.31simulation/s]Processing results: 100%|██████████| 100/100 [00:00<00:00, 286.93simulation/s]
-22:05:14 - backtester.workflow - INFO - Trade logs summary saved to: /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/monte_carlo/trade_log_summary.json
-22:05:14 - backtester.workflow - INFO - Permuted price comparison plots saved to: /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/monte_carlo/visualizations
-22:05:14 - backtester.workflow - INFO - Monte Carlo metric: total_return - Original: 12.243396897066328, Mean: 13.363353902526647, p-value: 0.34
-22:05:14 - backtester.workflow - INFO - Monte Carlo metric: sharpe_ratio - Original: 0.7651686314015831, Mean: 0.666647977909969, p-value: 0.49
-22:05:14 - backtester.workflow - INFO - Monte Carlo metric: max_drawdown - Original: 15.480609425250801, Mean: 11.785853169235184, p-value: 0.71
-22:05:14 - backtester.workflow - INFO - Monte Carlo metric: win_rate - Original: 0.33962264150943394, Mean: 0.27273788018399253, p-value: 0.0
-22:05:14 - backtester.workflow - INFO - Monte Carlo metric: profit_factor - Original: 1.5569200446229412, Mean: 1.521742188694096, p-value: 0.33
-22:05:14 - backtester.workflow - INFO - Monte Carlo process output captured in /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/logs/montecarlo_output.log
-22:05:14 - backtester.workflow - INFO - Complete workflow finished. Results saved to /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431
-22:05:14 - backtester.workflow - INFO - 
-Workflow completed successfully for SimpleStock
-22:05:14 - backtester.workflow - INFO - Best parameters: {'position_size': 100, 'sma_period': 20}
-22:05:14 - backtester.workflow - INFO - Results saved to /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431
-Starting unified workflow...
-Using parameter file: /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/parameters.json
-Parameter file exists. Contents:
-{
-    "parameters": {
-        "position_size": 100,
-        "sma_period": 20
-    }
-}
-Backtest completed!      
-Backtest completed! Results saved to /home/pyzron02/trading-strategy-backtester/output/SimpleStock_20250408_220431/complete_results.json
-
-Summary:

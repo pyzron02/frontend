@@ -1,5 +1,0 @@
-Parameter Optimization Log for MultiPosition
-Started at: 2025-04-08 21:55:03
-Tickers: ['AAPL']
-Period: 2015-01-01 to 2019-12-31
-

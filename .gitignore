@@ -1,0 +1,57 @@
+# Python bytecode files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and temporary files
+*.log
+logs/
+temp/
+
+# Flask specific
+instance/
+.webassets-cache
+
+# Backtest output files
+output/
+
+# Environment variables
+.env
+.flaskenv
+.env.*
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Local development settings
+local_settings.py
+dev_settings.py
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Mac specific
+.DS_Store
+
+# Windows specific
+Thumbs.db 
