@@ -328,23 +328,95 @@
             <!-- Monte Carlo Tab -->
             {% if monte_carlo_charts %}
             <div class="tab-pane fade" id="monte-carlo" role="tabpanel" aria-labelledby="monte-carlo-tab">
-                <div class="row">
-                    {% for chart in monte_carlo_charts %}
-                    <div class="col-md-6">
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">{{ chart.name|replace('.png', '')|replace('_', ' ')|title }}</h5>
-                            </div>
-                            <div class="card-body">
-                                <img src="{{ url_for('serve_image', image_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
-                                     alt="{{ chart.name }}" 
-                                     class="chart-img"
-                                     onerror="this.onerror=null; this.src=''; this.alt='Image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Chart image not found</div>'">
+                <!-- First find and display the dashboard image if available -->
+                {% set dashboard_found = false %}
+                {% for chart in monte_carlo_charts %}
+                    {% if 'dashboard' in chart.name.lower() %}
+                        {% set dashboard_found = true %}
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <div class="card">
+                                    <div class="card-header bg-dark text-white">
+                                        <h5 class="mb-0">Monte Carlo Dashboard</h5>
+                                    </div>
+                                    <div class="card-body text-center">
+                                        <img src="{{ url_for('serve_image', image_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                             alt="Monte Carlo Dashboard" 
+                                             class="img-fluid"
+                                             style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
+                                             onerror="this.onerror=null; this.src=''; this.alt='Dashboard image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Dashboard image not found</div>'">
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                    {% endif %}
+                {% endfor %}
+                
+                <!-- Create tabs for other Monte Carlo visualizations -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Monte Carlo Visualizations</h5>
                     </div>
-                    {% endfor %}
+                    <div class="card-body">
+                        <ul class="nav nav-tabs mb-3" id="monteCarloVisualizations" role="tablist">
+                            {% set first_tab = true %}
+                            {% for chart in monte_carlo_charts %}
+                                {% if 'dashboard' not in chart.name.lower() %}
+                                    <li class="nav-item" role="presentation">
+                                        {% set chart_id = chart.name|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower %}
+                                        <button class="nav-link {% if first_tab %}active{% endif %}" 
+                                                id="{{ chart_id }}-tab" 
+                                                data-bs-toggle="tab" 
+                                                data-bs-target="#{{ chart_id }}-content" 
+                                                type="button" 
+                                                role="tab" 
+                                                aria-controls="{{ chart_id }}-content" 
+                                                aria-selected="{% if first_tab %}true{% else %}false{% endif %}">
+                                            {{ chart.name|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace('_', ' ')|title }}
+                                        </button>
+                                    </li>
+                                    {% set first_tab = false %}
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                        
+                        <div class="tab-content" id="monteCarloVisualizationsContent">
+                            {% set first_tab = true %}
+                            {% for chart in monte_carlo_charts %}
+                                {% if 'dashboard' not in chart.name.lower() %}
+                                    {% set chart_id = chart.name|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower %}
+                                    <div class="tab-pane fade {% if first_tab %}show active{% endif %}" 
+                                         id="{{ chart_id }}-content" 
+                                         role="tabpanel" 
+                                         aria-labelledby="{{ chart_id }}-tab">
+                                        <div class="text-center">
+                                            <img src="{{ url_for('serve_image', image_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                 alt="{{ chart.name }}" 
+                                                 class="img-fluid"
+                                                 style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
+                                                 onerror="this.onerror=null; this.src=''; this.alt='Image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Chart image not found</div>'">
+                                        </div>
+                                    </div>
+                                    {% set first_tab = false %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
+                
+                <!-- If no dashboard was found, show a message -->
+                {% if not dashboard_found %}
+                <div class="alert alert-info mb-4">
+                    <h5>No Dashboard Visualization Found</h5>
+                    <p>The Monte Carlo dashboard visualization was not found. This might be because:</p>
+                    <ul>
+                        <li>The Monte Carlo simulation was run without the enhanced_plots option</li>
+                        <li>The dashboard file is named differently than expected</li>
+                        <li>The dashboard file is in an unexpected location</li>
+                    </ul>
+                    <p>You can still view individual visualizations in the tabs below.</p>
+                </div>
+                {% endif %}
             </div>
             {% endif %}
         </div>
