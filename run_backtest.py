@@ -10,18 +10,49 @@ import json
 import argparse
 import time
 import tempfile
+import inspect
 from datetime import datetime
 import threading
 import pandas as pd
 import numpy as np
 
+# Import local strategy adapters
+try:
+    from strategy_adapters import create_adapted_param_file
+except ImportError:
+    # If import fails, define a dummy function
+    def create_adapted_param_file(strategy_name, params, output_dir):
+        print(f"WARNING: strategy_adapters module not found, using default parameter handling")
+        return None
+
+# Try to import dotenv, gracefully handle if not installed
+try:
+    from dotenv import load_dotenv
+    # Load environment variables from .env file if it exists
+    load_dotenv()
+except ImportError:
+    # Define a dummy function if python-dotenv is not installed
+    def load_dotenv():
+        print("Warning: python-dotenv package not installed. Environment variables from .env file will not be loaded.")
+        pass
+    # Ensure the function is called for consistent behavior
+    load_dotenv()
+
 # Add the trading-strategy-backtester to the path
-project_root = '/home/pyzron02/trading-strategy-backtester'
+project_root = os.getenv('BACKTESTER_ROOT', '/home/pyzron02/trading-strategy-backtester')
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, 'src'))
 
-# Import the workflow
-from src.workflows.unified_workflow import run_complete_workflow
+# Try to import the workflow modules - we'll try again in main() if this fails
+try:
+    # Import unified_workflow for workflow selection
+    from src.workflows.unified_workflow import run_unified_workflow
+    # Import complete_workflow directly for running the complete workflow
+    from src.workflows.complete_workflow import run_complete_workflow
+except ImportError:
+    print("Warning: Could not import workflow modules. Will try again during execution.")
+    run_unified_workflow = None
+    run_complete_workflow = None
 
 def print_progress(stop_event):
     """Print a simple progress indicator until the stop_event is set."""
@@ -35,9 +66,65 @@ def print_progress(stop_event):
     sys.stdout.write("\rBacktest completed!      \n")
     sys.stdout.flush()
 
-def create_parameter_file(params, output_dir):
+def update_progress(progress_file, progress, status=None, current_step=None, current_step_progress=None, total_steps=None):
+    """
+    Update the progress file with current progress information.
+    
+    Args:
+        progress_file (str): Path to the progress file
+        progress (int): Overall progress percentage (0-100)
+        status (str, optional): Current status message
+        current_step (str, optional): Name of the current step
+        current_step_progress (int, optional): Progress of the current step (0-100)
+        total_steps (int, optional): Total number of steps
+    """
+    if not progress_file or not os.path.exists(progress_file):
+        return False
+    
+    try:
+        # Read existing progress data
+        with open(progress_file, 'r') as f:
+            progress_data = json.load(f)
+        
+        # Update with new values
+        if progress is not None:
+            progress_data['progress'] = min(100, max(0, progress))
+        if status:
+            progress_data['status'] = status
+        if current_step:
+            progress_data['current_step'] = current_step
+        if current_step_progress is not None:
+            progress_data['current_step_progress'] = min(100, max(0, current_step_progress))
+        if total_steps:
+            progress_data['total_steps'] = total_steps
+        
+        # Update timestamp
+        progress_data['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Write updated progress data
+        with open(progress_file, 'w') as f:
+            json.dump(progress_data, f, indent=4)
+        
+        return True
+    except Exception as e:
+        print(f"Error updating progress file: {e}")
+        return False
+
+def create_parameter_file(params, output_dir, strategy_name=None):
     """Create a parameter file for the backtest."""
-    # Create a parameters.json file in the standard format expected by the backtester
+    # Use strategy adapter if available
+    if strategy_name == 'AuctionMarket':
+        try:
+            # Try to use the specialized adapter for AuctionMarket strategy
+            if 'create_adapted_param_file' in globals():
+                param_file = create_adapted_param_file(strategy_name, params, output_dir)
+                if param_file:
+                    print(f"Using strategy adapter for {strategy_name}")
+                    return param_file
+        except Exception as e:
+            print(f"Error using strategy adapter: {e}, falling back to default")
+    
+    # If no adapter or adapter failed, use default parameter handling
     param_file = os.path.join(output_dir, 'parameters.json')
     
     # Check if params is already in the nested format with a 'parameters' key
@@ -78,8 +165,56 @@ def create_parameter_file(params, output_dir):
                 # For single run, keep parameters as is
                 param_data = {'parameters': params}
     
-    with open(param_file, 'w') as f:
-        json.dump(param_data, f, indent=4)
+    # Handle strategy-specific parameter adaptations for non-AuctionMarket strategies
+    if strategy_name and strategy_name != 'AuctionMarket':
+        # Specific handling for other strategies can be added here
+        pass
+    elif strategy_name == 'AuctionMarket':
+        # For AuctionMarket, don't use nested parameters - use flat format 
+        if isinstance(params, dict) and 'parameters' in params:
+            param_data = params['parameters']
+        else:
+            param_data = params
+            
+        # Ensure param_preset is set
+        if 'param_preset' not in param_data:
+            param_data['param_preset'] = 'default'
+            print("Added default param_preset for AuctionMarket strategy")
+    
+    # Create temp file first to verify it's properly formatted
+    temp_param_file = os.path.join(output_dir, 'temp_parameters.json')
+    try:
+        with open(temp_param_file, 'w') as f:
+            json.dump(param_data, f, indent=4)
+        
+        # Verify it's valid JSON by reading it back
+        with open(temp_param_file, 'r') as f:
+            test_data = json.load(f)
+        
+        # If we get here, the JSON is valid, so rename to final file
+        os.rename(temp_param_file, param_file)
+    except Exception as e:
+        print(f"Error creating parameter file: {e}")
+        # If there was an error, make sure we still create a valid parameters file
+        with open(param_file, 'w') as f:
+            fallback_params = {}
+            if strategy_name == 'AuctionMarket':
+                # Flat parameters for AuctionMarket
+                fallback_params = {
+                    'param_preset': 'default',
+                    'value_area': 0.7,
+                    'position_size': 100,
+                    'use_vwap': True,
+                    'use_volume_profile': True,
+                    'risk_percent': 0.01,
+                    'use_atr_sizing': True,
+                    'atr_period': 14
+                }
+            else:
+                # Nested parameters for other strategies
+                fallback_params = {'parameters': {'position_size': 100}}
+            json.dump(fallback_params, f, indent=4)
+        print(f"Created fallback parameter file due to formatting error")
     
     return param_file
 
@@ -101,14 +236,60 @@ def ensure_serializable(obj):
         return str(obj)
     return obj
 
+# Custom progress callback for the workflow
+def progress_callback(step, progress, message, progress_file=None):
+    """Callback function for workflow progress updates."""
+    if not progress_file:
+        return
+    
+    # Map workflow steps to progress percentages
+    step_weights = {
+        'initialization': 5,
+        'data_loading': 10,
+        'optimization': 30,
+        'walk_forward': 30,
+        'monte_carlo': 20,
+        'finalization': 5
+    }
+    
+    # Calculate overall progress based on step weights and current step progress
+    steps = list(step_weights.keys())
+    current_step_idx = steps.index(step) if step in steps else 0
+    
+    # Calculate progress from completed steps
+    completed_steps_progress = sum(step_weights[steps[i]] for i in range(current_step_idx))
+    
+    # Add progress from current step
+    current_step_progress = step_weights[step] * (progress / 100)
+    overall_progress = int(completed_steps_progress + current_step_progress)
+    
+    # Update progress file
+    update_progress(
+        progress_file,
+        progress=overall_progress,
+        status='Running',
+        current_step=f"{step.replace('_', ' ').title()}: {message}",
+        current_step_progress=progress,
+        total_steps=len(step_weights)
+    )
+    
+    # Also print to console
+    print(f"[PROGRESS] {step}: {progress}% - {message} (Overall: {overall_progress}%)")
+
 def main():
     parser = argparse.ArgumentParser(description='Run a backtest with parameters from a JSON file')
     parser.add_argument('--config', type=str, required=True, help='Path to the JSON config file')
     parser.add_argument('--output', type=str, help='Output directory (overrides the one in config)')
     parser.add_argument('--debug', action='store_true', help='Enable extra debug output')
+    parser.add_argument('--progress-file', type=str, help='Path to file for tracking progress')
     args = parser.parse_args()
     
     debug_mode = args.debug
+    progress_file = args.progress_file
+    
+    # Initialize progress if a progress file is provided
+    if progress_file:
+        update_progress(progress_file, 0, "Starting", "Initializing backtest", 0, 6)
     
     # Load the configuration
     with open(args.config, 'r') as f:
@@ -121,8 +302,13 @@ def main():
     # Default output directory if not specified
     if 'output_dir' not in config:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        config['output_dir'] = os.path.join('/home/pyzron02/trading-strategy-backtester/output', 
+        config['output_dir'] = os.path.join(os.getenv('BACKTESTER_OUTPUT_DIR', 
+                                                     os.path.join(project_root, 'output')), 
                                f"{config.get('strategy_name', 'backtest')}_{timestamp}")
+    
+    # Ensure the correct data directory is set
+    if 'data_dir' not in config:
+        config['data_dir'] = os.path.join(project_root, 'input')
     
     # Create the output directory
     os.makedirs(config['output_dir'], exist_ok=True)
@@ -138,6 +324,10 @@ def main():
     end_date = config.get('end_date')
     run_optimization = config.get('run_optimization', False)
     
+    # Update progress - Configuration loaded
+    if progress_file:
+        update_progress(progress_file, 5, "Preparing", "Loading configuration", 100, 6)
+    
     # Print information about the backtest
     print(f"Starting backtest for strategy: {strategy_name}")
     print(f"Tickers: {tickers}")
@@ -152,11 +342,23 @@ def main():
     
     # Check that the strategy exists
     try:
-        from src.strategies.registry import get_strategy_class
+        # First try with the full path import
+        try:
+            # Try the absolute import path with project_root
+            sys.path.insert(0, project_root)
+            from src.strategies.registry import get_strategy_class
+        except ImportError:
+            # Fall back to the relative import
+            from strategies.registry import get_strategy_class
+            
         strategy_class = get_strategy_class(strategy_name)
         print(f"Found strategy class: {strategy_class.__name__}")
     except Exception as e:
         print(f"WARNING: Could not verify strategy class: {e}")
+    
+    # Update progress - Strategy loaded
+    if progress_file:
+        update_progress(progress_file, 10, "Preparing", "Strategy loaded", 100, 6)
     
     # Ensure param_file is created even if we're using fixed parameters
     if run_optimization:
@@ -166,7 +368,7 @@ def main():
             param_grid = config['param_grid']
             # Create a parameter file if not already specified
             if 'param_file' not in config:
-                param_file = create_parameter_file(param_grid, config['output_dir'])
+                param_file = create_parameter_file(param_grid, config['output_dir'], strategy_name)
                 config['param_file'] = param_file
         elif 'param_file' in config:
             param_file = config['param_file']
@@ -177,18 +379,28 @@ def main():
         if 'params' in config:
             params = config['params']
             # Create a parameter file for single values
-            param_file = create_parameter_file(params, config['output_dir'])
+            param_file = create_parameter_file(params, config['output_dir'], strategy_name)
             config['param_file'] = param_file
             print(f"Parameters formatted for optimization: {param_file}")
     
     # Ensure the parameter file exists
     if 'param_file' not in config:
         print("WARNING: No parameter file specified, creating an empty one")
+        # Create empty parameters with strategy-specific defaults
         empty_params = {'parameters': {}}
-        param_file = os.path.join(config['output_dir'], 'parameters.json')
-        with open(param_file, 'w') as f:
-            json.dump(empty_params, f, indent=4)
+        if strategy_name == 'AuctionMarket':
+            empty_params['parameters'] = {
+                'param_preset': 'default',
+                'value_area': 0.7,
+                'position_size': 100
+            }
+            
+        param_file = create_parameter_file(empty_params, config['output_dir'], strategy_name)
         config['param_file'] = param_file
+    
+    # Update progress - Parameters loaded
+    if progress_file:
+        update_progress(progress_file, 15, "Preparing", "Parameters loaded", 100, 6)
     
     # Start a progress indicator thread
     stop_event = threading.Event()
@@ -225,23 +437,102 @@ def main():
             else:
                 print(f"WARNING: Parameter file does not exist: {config['param_file']}")
         
-        # Import the run_complete_workflow function here to ensure it's using the correct Python path
-        from src.workflows.unified_workflow import run_complete_workflow
+        # Update progress - Starting workflow
+        if progress_file:
+            update_progress(progress_file, 20, "Running", "Starting workflow", 0, 6)
         
-        result = run_complete_workflow(
-            strategy_name=strategy_name,
-            tickers=tickers,
-            start_date=start_date,
-            end_date=end_date,
-            param_file=config.get('param_file'),
-            num_workers=config.get('num_workers', 1),
-            output_dir=config['output_dir'],
-            in_sample_ratio=config.get('in_sample_ratio', 0.7),
-            num_simulations=config.get('num_simulations', 1000),
-            verbose=config.get('verbose', False),
-            seed=config.get('seed', 42),
-            keep_permuted_data=config.get('keep_permuted_data', False)
-        )
+        # Import the run_complete_workflow function here to ensure it's using the correct Python path
+        try:
+            # First try with the full path import with project_root
+            sys.path.insert(0, project_root)
+            from src.workflows.unified_workflow import run_complete_workflow
+        except ImportError:
+            # Fall back to the relative import
+            from workflows.unified_workflow import run_complete_workflow
+        
+        # Create a custom progress reporter wrapper function that includes the progress file
+        def progress_reporter(step, progress, message):
+            return progress_callback(step, progress, message, progress_file)
+        
+        # Use the specific workflow type if specified, otherwise use complete workflow
+        workflow_type = config.get('workflow_type', 'complete')
+        
+        # Prepare common workflow arguments
+        workflow_args = {
+            "strategy_name": strategy_name,
+            "tickers": tickers,
+            "start_date": start_date,
+            "end_date": end_date,
+            "param_file": config.get('param_file'),
+            "output_dir": config['output_dir'],
+            "data_dir": config.get('data_dir', os.path.join(project_root, 'input')),
+            "verbose": config.get('verbose', False),
+            "initial_capital": config.get('initial_capital', 100000.0),
+            "commission": config.get('commission', 0.001),
+            "keep_permuted_data": config.get('keep_permuted_data', False),
+            "plot": config.get('generate_plots', False),  # Respect the generate_plots setting
+        }
+        
+        # Add workflow-specific arguments
+        if workflow_type == 'complete':
+            workflow_args.update({
+                "n_simulations": config.get('num_simulations', 1000),
+                "n_trials": 50,  # Default number of optimization trials
+                "enhanced_plots": config.get('enhanced_plots', False),
+            })
+            
+            # Special handling for AuctionMarket parameters
+            if strategy_name == 'AuctionMarket':
+                # For AuctionMarket, param_file may not work properly due to nested structure
+                # Remove param_file and directly pass the parameters
+                if 'param_file' in workflow_args:
+                    del workflow_args['param_file']
+                    
+                # Extract parameters from the parameter file
+                if 'param_file' in config and os.path.exists(config['param_file']):
+                    try:
+                        with open(config['param_file'], 'r') as f:
+                            direct_params = json.load(f)
+                        
+                        # Parameters should be directly at the root level for AuctionMarket
+                        workflow_args['parameters'] = direct_params
+                        print("Using direct parameters for AuctionMarket strategy")
+                    except Exception as e:
+                        print(f"Error loading parameters for AuctionMarket: {e}")
+                        # Set default parameters
+                        workflow_args['parameters'] = {
+                            'param_preset': 'default',
+                            'value_area': 0.7,
+                            'position_size': 100
+                        }
+            
+            # Try to create a progress callback for unified/complete workflow
+            if 'progress_callback' in inspect.signature(run_complete_workflow).parameters:
+                workflow_args["progress_callback"] = progress_reporter if progress_file else None
+            
+            # Run the complete workflow
+            print(f"Running complete workflow with strategy: {strategy_name}")
+            result = run_complete_workflow(**workflow_args)
+        else:
+            # If using unified_workflow, add in_sample_ratio and any other specific parameters
+            # Check for specific workflow types
+            if workflow_type in ['simple', 'optimization', 'monte_carlo', 'walkforward']:
+                workflow_args.update({
+                    "in_sample_ratio": config.get('in_sample_ratio', 0.7),
+                    "n_simulations": config.get('num_simulations', 1000),  # Use n_simulations instead of num_simulations
+                    "n_trials": 50,  # Set default number of optimization trials
+                })
+            else:
+                # For any other workflow (especially unified workflow)
+                workflow_args.update({
+                    "in_sample_ratio": config.get('in_sample_ratio', 0.7),
+                    "num_simulations": config.get('num_simulations', 1000),
+                    "num_workers": config.get('num_workers', 1),
+                    "seed": config.get('seed', 42),
+                })
+            
+            print(f"Running {workflow_type} workflow with strategy: {strategy_name}")
+            result = run_unified_workflow(workflow_type, **workflow_args)
         
         # Stop the progress indicator
         stop_event.set()
@@ -249,226 +540,79 @@ def main():
         
         # Save the results
         results_file = os.path.join(config['output_dir'], 'complete_results.json')
+        with open(results_file, 'w') as f:
+            json.dump(result, f, indent=4, cls=json._default_encoder.__class__)
+        
+        # Add additional code to create a merged result for the UI
         try:
-            with open(results_file, 'w') as f:
-                # Convert any non-serializable objects
-                result_json = json.dumps(result, default=lambda o: str(o), indent=4)
-                f.write(result_json)
-        except Exception as e:
-            print(f"Warning: Could not save full results: {e}")
-            # Try a simpler approach
-            with open(results_file, 'w') as f:
-                json.dump({"success": True, "message": "Results saved separately"}, f)
-        
-        print(f"Backtest completed! Results saved to {results_file}")
-        print("\nSummary:")
-        
-        # Print some summary metrics if available
-        if 'walk_forward_metrics' in result and 'out_of_sample' in result['walk_forward_metrics']:
-            metrics = result['walk_forward_metrics']['out_of_sample']
-            print(f"  Sharpe Ratio: {metrics.get('sharpe_ratio', 'N/A')}")
-            print(f"  Total Return: {metrics.get('total_return', 'N/A')}")
-            print(f"  Max Drawdown: {metrics.get('max_drawdown', 'N/A')}")
-            print(f"  Win Rate: {metrics.get('win_rate', 'N/A')}")
-        
-        # Create a simple backtest_results.json file for displaying in the UI
-        ui_results_file = os.path.join(config['output_dir'], 'backtest_results.json')
-        ui_results = {
-            'strategy_name': strategy_name,
-            'tickers': tickers,
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'metrics': {}
-        }
-        
-        # Extract metrics from the results
-        # Try multiple potential locations for metrics
-        metrics_found = False
-        
-        # 1. First check if metrics are in walk_forward_metrics - out_of_sample
-        if 'walk_forward_metrics' in result and 'out_of_sample' in result['walk_forward_metrics']:
-            # Make sure we safely extract the metrics (handling pandas objects)
-            try:
-                out_of_sample_metrics = result['walk_forward_metrics']['out_of_sample']
-                if isinstance(out_of_sample_metrics, (pd.Series, pd.DataFrame)):
-                    # Convert pandas objects to dictionaries
-                    ui_results['metrics'] = out_of_sample_metrics.to_dict()
-                else:
-                    ui_results['metrics'] = out_of_sample_metrics
-                metrics_found = True
-            except Exception as e:
-                print(f"Error extracting out_of_sample metrics: {e}")
-                # Handle the error gracefully
-                ui_results['metrics'] = {}
-                
-        # 2. Check Out-of-Sample (different casing)
-        elif 'walk_forward_metrics' in result and 'Out-of-Sample' in result['walk_forward_metrics']:
-            try:
-                out_of_sample_metrics = result['walk_forward_metrics']['Out-of-Sample']
-                if isinstance(out_of_sample_metrics, (pd.Series, pd.DataFrame)):
-                    # Convert pandas objects to dictionaries
-                    ui_results['metrics'] = out_of_sample_metrics.to_dict()
-                else:
-                    ui_results['metrics'] = out_of_sample_metrics
-                metrics_found = True
-            except Exception as e:
-                print(f"Error extracting Out-of-Sample metrics: {e}")
-                # Handle the error gracefully
-                ui_results['metrics'] = {}
-        
-        # 3. If no metrics found, try to calculate from the trade data
-        if not metrics_found or not ui_results['metrics']:
-            # Look for trade log files
-            out_sample_dir = os.path.join(config['output_dir'], 'walk_forward', 'out_sample')
-            in_sample_dir = os.path.join(config['output_dir'], 'walk_forward', 'in_sample')
+            merged_result = {'strategy_name': strategy_name}
             
-            # Try to find results in out_sample directory
-            backtest_results_file = os.path.join(out_sample_dir, 'backtest_results.json')
+            # Check for backtest results
+            backtest_results_file = os.path.join(config['output_dir'], '2_backtest', 'backtest_results.json')
             if os.path.exists(backtest_results_file):
-                try:
-                    with open(backtest_results_file, 'r') as f:
-                        backtest_data = json.load(f)
-                    
-                    # Calculate metrics from trade data
-                    if 'trades' in backtest_data and backtest_data['trades']:
-                        # Convert trades to DataFrame for easier analysis
-                        trades_df = pd.DataFrame(backtest_data['trades'])
-                        
-                        # Calculate total return from trades
-                        if not trades_df.empty and 'pnl' in trades_df.columns:
-                            # Calculate safely to avoid pandas Series truth value errors
-                            try:
-                                total_pnl = trades_df['pnl'].sum()
-                                initial_balance = 10000  # Default initial balance
-                                total_return = (total_pnl / initial_balance) * 100.0
-                                
-                                # Calculate win rate
-                                winning_trades = trades_df[trades_df['pnl'] > 0]
-                                total_trades = len(trades_df[trades_df['type'] == 'close'])
-                                win_rate = len(winning_trades) / total_trades if total_trades > 0 else 0
-                                
-                                # Calculate max drawdown
-                                # Simplified approximation based on consecutive losing trades
-                                trades_df['cumulative_pnl'] = trades_df['pnl'].cumsum()
-                                cumulative_max = trades_df['cumulative_pnl'].cummax()
-                                drawdown = (cumulative_max - trades_df['cumulative_pnl'])
-                                max_drawdown = drawdown.max() / initial_balance * 100.0 if initial_balance > 0 else 0
-                                
-                                # Simple Sharpe ratio approximation
-                                # (Return - Risk Free Rate) / Standard Deviation
-                                risk_free_rate = 0.0  # Simplified
-                                returns_std = trades_df['pnl'].std()
-                                sharpe_ratio = (total_pnl - risk_free_rate) / returns_std if returns_std > 0 else 0
-                                
-                                # Add calculated metrics to results
-                                ui_results['metrics'] = {
-                                    'total_return': float(total_return),
-                                    'sharpe_ratio': float(sharpe_ratio),
-                                    'max_drawdown': float(max_drawdown),
-                                    'win_rate': float(win_rate)
-                                }
-                                metrics_found = True
-                                print(f"Calculated metrics from trade data: {ui_results['metrics']}")
-                            except Exception as e:
-                                print(f"Error during metrics calculation: {e}")
-                                # Set an empty dict rather than a partially calculated metrics dict
-                                ui_results['metrics'] = {}
-                except Exception as e:
-                    print(f"Error calculating metrics from trade data: {e}")
+                with open(backtest_results_file, 'r') as f:
+                    backtest_data = json.load(f)
+                    if 'metrics' in backtest_data:
+                        if 'metrics' not in merged_result:
+                            merged_result['metrics'] = {}
+                        merged_result['metrics'].update(backtest_data['metrics'])
+                    if 'parameters' in backtest_data:
+                        merged_result['parameters'] = backtest_data['parameters']
+            
+            # Check for Monte Carlo results
+            monte_carlo_results_file = os.path.join(config['output_dir'], '3_monte_carlo', f'{strategy_name}_monte_carlo_results.json')
+            if os.path.exists(monte_carlo_results_file):
+                with open(monte_carlo_results_file, 'r') as f:
+                    mc_data = json.load(f)
+                    if 'metrics' in mc_data:
+                        if 'metrics' not in merged_result:
+                            merged_result['metrics'] = {}
+                        merged_result['metrics'].update(mc_data['metrics'])
+                    if 'analysis' in mc_data:
+                        merged_result['monte_carlo_results'] = {'analysis': mc_data['analysis']}
+            
+            # Additionally save to a UI friendly format
+            if merged_result:
+                ui_results_file = os.path.join(config['output_dir'], 'ui_results.json')
+                with open(ui_results_file, 'w') as f:
+                    json.dump(merged_result, f, indent=4, cls=json._default_encoder.__class__)
+                print(f"Created UI-friendly results file at {ui_results_file}")
+        except Exception as e:
+            print(f"Warning: Failed to create merged results file: {e}")
         
-        # Ensure metrics are properly formatted
-        if not metrics_found or (isinstance(ui_results['metrics'], dict) and not ui_results['metrics']) or \
-           (isinstance(ui_results['metrics'], pd.Series) and ui_results['metrics'].empty):
-            # Provide default metrics based on workflow results
-            try:
-                if 'best_parameters' in result and result['best_parameters']:
-                    ui_results['parameters'] = result['best_parameters']
-                
-                # Provide empty metrics with proper keys
-                ui_results['metrics'] = {
-                    'total_return': 0.0,
-                    'sharpe_ratio': 0.0,
-                    'max_drawdown': 0.0,
-                    'win_rate': 0.0
-                }
-                
-                # Add any metrics we found in the result but didn't recognize
-                for key, section in result.items():
-                    if isinstance(section, dict) and any(metric in section for metric in ['total_return', 'sharpe_ratio']):
-                        print(f"Found metrics in section: {key}")
-                        for metric_key, metric_value in section.items():
-                            if metric_key not in ui_results['metrics']:
-                                ui_results['metrics'][metric_key] = metric_value
-                
-                print(f"Using default metrics: {ui_results['metrics']}")
-            except Exception as e:
-                print(f"Error creating default metrics: {e}")
-                ui_results['metrics'] = {
-                    'total_return': 0.0,
-                    'sharpe_ratio': 0.0,
-                    'max_drawdown': 0.0,
-                    'win_rate': 0.0
-                }
+        print(f"Results saved to {results_file}")
         
-        # Save the UI results
-        # Ensure all values are JSON serializable
-        ui_results = ensure_serializable(ui_results)
-        with open(ui_results_file, 'w') as f:
-            json.dump(ui_results, f, indent=4)
+        # Update progress - Results saved
+        if progress_file:
+            update_progress(progress_file, 95, "Finishing", "Saving results", 100, 6)
+            time.sleep(1)  # Small delay to ensure progress is visible
+            update_progress(progress_file, 100, "Completed", "Backtest complete", 100, 6)
         
         return 0
     except Exception as e:
-        # Stop the progress indicator
-        stop_event.set()
-        progress_thread.join()
-        
         import traceback
         error_traceback = traceback.format_exc()
-        print(f"\nError running backtest: {e}")
-        print(f"Traceback:\n{error_traceback}")
+        print(f"Error running backtest: {e}")
+        print(error_traceback)
         
-        # Print helpful debugging information
-        print("\nDebugging information:")
-        print(f"Python version: {sys.version}")
-        print(f"Current directory: {os.getcwd()}")
-        print(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}")
-        print(f"sys.path: {sys.path}")
-        
-        # Save the error to a file
-        error_file = os.path.join(config['output_dir'], 'error.txt')
+        # Log the error to a file
+        error_file = os.path.join(config['output_dir'], 'backtest_error.log')
         with open(error_file, 'w') as f:
-            f.write(f"Error: {str(e)}\n\n")
-            f.write(f"Traceback:\n{error_traceback}")
-            
-            # Add debugging information
-            f.write("\n\nDebugging information:\n")
-            f.write(f"Python version: {sys.version}\n")
-            f.write(f"Current directory: {os.getcwd()}\n")
-            f.write(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}\n")
-            f.write(f"Parameter file: {config.get('param_file', 'Not set')}\n")
-            if 'param_file' in config and os.path.exists(config['param_file']):
-                with open(config['param_file'], 'r') as param_f:
-                    f.write(f"Parameter file contents:\n{param_f.read()}\n")
-        
-        # Create a simple backtest_results.json file for displaying in the UI
-        ui_results_file = os.path.join(config['output_dir'], 'backtest_results.json')
-        ui_results = {
-            'strategy_name': strategy_name,
-            'tickers': tickers,
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'error': str(e),
-            'metrics': {'error': 'Backtest failed'}
-        }
-        
-        # Ensure all values are JSON serializable
-        ui_results = ensure_serializable(ui_results)
-        with open(ui_results_file, 'w') as f:
-            json.dump(ui_results, f, indent=4)
+            f.write(f"Error: {e}\n\n")
+            f.write(error_traceback)
         
         print(f"Error details saved to {error_file}")
-        return 1
-    finally:
-        # Make sure the progress indicator is stopped
+        
+        # Update progress with error
+        if progress_file:
+            update_progress(progress_file, -1, "Failed", f"Error: {str(e)}", 0, 6)
+        
+        # Stop the progress indicator
         stop_event.set()
+        if progress_thread.is_alive():
+            progress_thread.join()
+        
+        return 1
 
 if __name__ == '__main__':
     sys.exit(main()) 

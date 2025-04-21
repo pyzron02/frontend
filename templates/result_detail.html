@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ strategy_name }} - {{ workflow_type|capitalize }} Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        .chart-container {
+            height: 400px;
+            margin-bottom: 30px;
+        }
+        .summary-header {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .nav-tabs .nav-link {
+            color: #495057;
+        }
+        .nav-tabs .nav-link.active {
+            color: #007bff;
+            font-weight: 500;
+        }
+        code {
+            color: #d63384;
+        }
+        .metric-card {
+            margin-bottom: 15px;
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+        .metric-name {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .trade-table {
+            font-size: 0.9rem;
+        }
+        .alert-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .chart-img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="pb-3 mb-4 border-bottom">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="display-5 fw-bold">{{ strategy_name }} <span class="fs-4 text-muted">{{ workflow_type|capitalize }} Results</span></h1>
+                </div>
+                <div>
+                    <a href="{{ url_for('results') }}" class="btn btn-outline-primary me-2">All Results</a>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Back to Backtester</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="alert-container">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="summary-header">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-0"><strong>Output Directory:</strong> <code>{{ folder_path }}</code></p>
+                            <p class="mb-0"><strong>Workflow:</strong> {{ workflow_type|capitalize }}</p>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <a href="{{ url_for('view_log', folder_name=folder_name) }}" class="btn btn-sm btn-outline-secondary">View Logs</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs mb-4" id="resultTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab" aria-controls="summary" aria-selected="true">Summary</button>
+            </li>
+            {% if equity_curve %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="equity-tab" data-bs-toggle="tab" data-bs-target="#equity" type="button" role="tab" aria-controls="equity" aria-selected="false">Equity Curve</button>
+            </li>
+            {% endif %}
+            {% if trade_log %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="trades-tab" data-bs-toggle="tab" data-bs-target="#trades" type="button" role="tab" aria-controls="trades" aria-selected="false">Trades</button>
+            </li>
+            {% endif %}
+            {% if optimization_results %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="optimization-tab" data-bs-toggle="tab" data-bs-target="#optimization" type="button" role="tab" aria-controls="optimization" aria-selected="false">Optimization</button>
+            </li>
+            {% endif %}
+            {% if monte_carlo_charts %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="monte-carlo-tab" data-bs-toggle="tab" data-bs-target="#monte-carlo" type="button" role="tab" aria-controls="monte-carlo" aria-selected="false">Monte Carlo</button>
+            </li>
+            {% endif %}
+        </ul>
+
+        <div class="tab-content" id="resultTabContent">
+            <!-- Summary Tab -->
+            <div class="tab-pane fade show active" id="summary" role="tabpanel" aria-labelledby="summary-tab">
+                {% if summaries %}
+                    <div class="row">
+                        {% for summary in summaries %}
+                            <div class="col-md-12">
+                                <div class="card mb-4">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0">{{ summary.name }}</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <pre class="mb-0"><code>{{ summary.content }}</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">No summary files found for this result.</div>
+                {% endif %}
+            </div>
+
+            <!-- Equity Curve Tab -->
+            {% if equity_curve %}
+            <div class="tab-pane fade" id="equity" role="tabpanel" aria-labelledby="equity-tab">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Equity Curve</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if equity_curve.dates and equity_curve.equity and equity_curve.dates|length > 0 and equity_curve.equity|length > 0 %}
+                                <div class="chart-container">
+                                    <canvas id="equityCurveChart"></canvas>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-warning">
+                                    <h5>No Equity Curve Data Available</h5>
+                                    <p>The equity curve data could not be found or loaded. This might be because:</p>
+                                    <ul>
+                                        <li>The backtest is still running</li>
+                                        <li>The strategy did not generate equity curve data</li>
+                                        <li>The output files are in an unexpected location</li>
+                                    </ul>
+                                    <p>Check the logs for more information.</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Trades Tab -->
+            {% if trade_log %}
+            <div class="tab-pane fade" id="trades" role="tabpanel" aria-labelledby="trades-tab">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Trade Log</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover trade-table">
+                                        <thead>
+                                            <tr>
+                                                {% for col in trade_log.data[0].keys() %}
+                                                <th>{{ col|capitalize }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for trade in trade_log.data %}
+                                            <tr class="{{ 'table-success' if trade.pnl and trade.pnl > 0 else 'table-danger' if trade.pnl and trade.pnl < 0 else '' }}">
+                                                {% for key, value in trade.items() %}
+                                                <td>{{ value }}</td>
+                                                {% endfor %}
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Optimization Tab -->
+            {% if optimization_results %}
+            <div class="tab-pane fade" id="optimization" role="tabpanel" aria-labelledby="optimization-tab">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Optimization Results</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if optimization_results.type == 'best_params' %}
+                                    <h6>Best Parameters:</h6>
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Parameter</th>
+                                                <th>Value</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for param, value in optimization_results.data.items() %}
+                                            <tr>
+                                                <td>{{ param }}</td>
+                                                <td>{{ value }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                {% elif optimization_results.type == 'best_params_text' %}
+                                    <h6>Best Parameters:</h6>
+                                    <pre><code>{{ optimization_results.data }}</code></pre>
+                                {% elif optimization_results.type == 'trials' %}
+                                    <h6>Optimization Trials:</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Trial</th>
+                                                    {% for col in optimization_results.data[0].keys() if col != 'trial' %}
+                                                    <th>{{ col }}</th>
+                                                    {% endfor %}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for trial in optimization_results.data %}
+                                                <tr>
+                                                    <td>{{ loop.index }}</td>
+                                                    {% for key, value in trial.items() if key != 'trial' %}
+                                                    <td>{{ value }}</td>
+                                                    {% endfor %}
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Monte Carlo Tab -->
+            {% if monte_carlo_charts %}
+            <div class="tab-pane fade" id="monte-carlo" role="tabpanel" aria-labelledby="monte-carlo-tab">
+                <div class="row">
+                    {% for chart in monte_carlo_charts %}
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">{{ chart.name|replace('.png', '')|replace('_', ' ')|title }}</h5>
+                            </div>
+                            <div class="card-body">
+                                <img src="{{ url_for('serve_image', image_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                     alt="{{ chart.name }}" 
+                                     class="chart-img"
+                                     onerror="this.onerror=null; this.src=''; this.alt='Image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Chart image not found</div>'">
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if equity_curve and equity_curve.dates and equity_curve.equity and equity_curve.dates|length > 0 and equity_curve.equity|length > 0 %}
+            // Render equity curve chart
+            const equityCtx = document.getElementById('equityCurveChart');
+            if (equityCtx) {
+                const ctxElement = equityCtx.getContext('2d');
+                const equityDates = {{ equity_curve.dates|tojson }};
+                const equityValues = {{ equity_curve.equity|tojson }};
+                
+                new Chart(ctxElement, {
+                    type: 'line',
+                    data: {
+                        labels: equityDates,
+                        datasets: [{
+                            label: 'Equity',
+                            data: equityValues,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            tension: 0.1,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Equity Curve'
+                            }
+                        }
+                    }
+                });
+            }
+            {% endif %}
+        });
+    </script>
+</body>
+</html> 

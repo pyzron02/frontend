@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backtest Results - Trading Strategy Backtester</title>
+    <title>Backtest Results</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         body {
             padding-top: 2rem;
@@ -13,87 +12,21 @@
         }
         .card {
             margin-bottom: 20px;
+            transition: transform 0.2s;
         }
-        .running {
-            border-left: 4px solid #007bff;
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
-        .error {
-            border-left: 4px solid #dc3545;
+        .workflow-badge {
+            font-size: 0.8rem;
+            margin-left: 10px;
         }
         .alert-container {
             position: fixed;
             top: 20px;
             right: 20px;
             z-index: 9999;
-        }
-        .spinner-border {
-            width: 1rem;
-            height: 1rem;
-            margin-right: 5px;
-        }
-        /* Enhanced styling */
-        .card-body {
-            padding: 1.25rem;
-        }
-        .metrics-tabs .nav-link {
-            padding: 0.5rem 1rem;
-            font-size: 0.9rem;
-        }
-        .metrics-container {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .chart-container {
-            position: relative;
-            height: 250px;
-            width: 100%;
-        }
-        .expandable-section {
-            margin-bottom: 1rem;
-        }
-        .expandable-header {
-            background-color: #f8f9fa;
-            padding: 0.5rem 1rem;
-            border-radius: 0.25rem;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .expandable-content {
-            padding: 1rem;
-            border: 1px solid #f0f0f0;
-            border-top: none;
-            border-radius: 0 0 0.25rem 0.25rem;
-            display: none;
-        }
-        .show-content {
-            display: block;
-        }
-        .tooltip-icon {
-            margin-left: 5px;
-            color: #6c757d;
-            cursor: help;
-        }
-        .metrics-table {
-            font-size: 0.9rem;
-        }
-        .metrics-table th {
-            font-weight: 500;
-        }
-        .ticker-pill {
-            font-size: 0.8rem;
-            margin-right: 5px;
-            margin-bottom: 5px;
-        }
-        .monthly-performance-container {
-            height: 200px;
-        }
-        .result-card {
-            transition: all 0.3s ease;
-        }
-        .result-card:hover {
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
     </style>
 </head>
@@ -119,500 +52,74 @@
             {% endwith %}
         </div>
 
-        <div id="status-updates" class="mb-4 d-none">
-            <div class="alert alert-info">
-                <div class="d-flex align-items-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
+        {% if folders %}
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Filter Results</h5>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <select id="strategy-filter" class="form-select">
+                                        <option value="">All Strategies</option>
+                                        {% set strategies = [] %}
+                                        {% for folder in folders %}
+                                            {% if folder.strategy not in strategies %}
+                                                {% set strategies = strategies + [folder.strategy] %}
+                                                <option value="{{ folder.strategy }}">{{ folder.strategy }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select id="workflow-filter" class="form-select">
+                                        <option value="">All Workflows</option>
+                                        <option value="simple">Simple Backtest</option>
+                                        <option value="optimization">Optimization</option>
+                                        <option value="monte_carlo">Monte Carlo</option>
+                                        <option value="complete">Complete Workflow</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" id="date-filter" class="form-control" placeholder="Search by date (YYYYMMDD)">
+                                </div>
+                                <div class="col-md-3 d-grid">
+                                    <button id="reset-filter" class="btn btn-outline-secondary">Reset Filters</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div>Updating backtest status...</div>
                 </div>
             </div>
-        </div>
 
-        {% if error_message is defined and error_message %}
-        <div class="alert alert-danger">
-            <h4 class="alert-heading">Error Loading Results</h4>
-            <p>There was an error loading the full results data. Showing simplified results instead.</p>
-            <hr>
-            <p class="mb-0"><strong>Error details:</strong> {{ error_message }}</p>
-        </div>
-        {% endif %}
-
-        {% if results %}
             <div class="row" id="results-container">
-                {% for result in results %}
-                    <div class="col-md-12 mb-4">
-                        <div class="card result-card {% if result.running is defined and result.running %}running{% endif %} {% if result.error is defined and result.error %}error{% endif %} {% if result.serialization_error is defined and result.serialization_error %}border-warning{% endif %}">
+                {% for folder in folders %}
+                    <div class="col-md-6 result-item" 
+                         data-strategy="{{ folder.strategy }}" 
+                         data-workflow="{{ folder.workflow }}" 
+                         data-timestamp="{{ folder.timestamp }}">
+                        <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h5>{{ result.strategy }}</h5>
-                                    <small class="text-muted">{{ result.timestamp }}</small>
-                                    {% if result.enhanced_data and result.enhanced_data.period %}
-                                        <small class="text-muted ms-3">
-                                            Period: {{ result.enhanced_data.period.start_date }} to {{ result.enhanced_data.period.end_date }}
-                                        </small>
-                                    {% endif %}
+                                    <h5 class="mb-0">
+                                        {{ folder.strategy }}
+                                        <span class="badge bg-{{ 'primary' if folder.workflow == 'simple' else 'success' if folder.workflow == 'optimization' else 'info' if folder.workflow == 'monte_carlo' else 'warning' }} workflow-badge">
+                                            {{ folder.workflow|capitalize }}
+                                        </span>
+                                    </h5>
+                                    <small class="text-muted">{{ folder.timestamp }}</small>
                                 </div>
-                                <span class="badge {% if result.status == 'Running' %}bg-primary{% elif result.status == 'Failed' %}bg-danger{% elif result.serialization_error is defined and result.serialization_error %}bg-warning{% else %}bg-success{% endif %}">
-                                    {% if result.status == 'Running' %}
-                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                                    {% endif %}
-                                    {{ result.status }}
-                                </span>
                             </div>
                             <div class="card-body">
-                                {% if result.running is defined and result.running %}
-                                    <p>Backtest is currently running...</p>
-                                    <div class="progress mb-3">
-                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                             role="progressbar" 
-                                             aria-valuenow="100" 
-                                             aria-valuemin="0" 
-                                             aria-valuemax="100" 
-                                             style="width: 100%"></div>
-                                    </div>
-                                    <div class="text-end">
-                                        <button class="btn btn-sm btn-danger cancel-btn" 
-                                                data-job-id="{{ result.folder.split('_')[-1] }}">
-                                            Cancel Backtest
-                                        </button>
-                                    </div>
-                                {% elif result.error is defined and result.error %}
-                                    <div class="alert alert-danger">
-                                        <h6>Error:</h6>
-                                        <p>{{ result.metrics.error }}</p>
-                                    </div>
-                                {% elif result.serialization_error is defined and result.serialization_error %}
-                                    <div class="alert alert-warning">
-                                        <h6>Data Serialization Error</h6>
-                                        <p>The detailed results for this backtest could not be displayed due to a data formatting issue.</p>
-                                        <p>This is often caused by complex data structures that cannot be properly displayed in the browser.</p>
-                                        <p>You can still access the raw data files directly in the output directory.</p>
-                                    </div>
-                                    <div class="text-end mt-3">
-                                        <a href="/home/pyzron02/trading-strategy-backtester/output/{{ result.folder }}" 
-                                           class="btn btn-sm btn-primary" 
-                                           onclick="alert('Results folder: /home/pyzron02/trading-strategy-backtester/output/{{ result.folder }}'); return false;">
-                                            View Raw Results
-                                        </a>
-                                    </div>
-                                {% else %}
-                                    <!-- Metrics Tabs -->
-                                    <ul class="nav nav-tabs metrics-tabs mb-4" id="metrics-tabs-{{ loop.index }}" role="tablist">
-                                        <li class="nav-item" role="presentation">
-                                            <button class="nav-link active" 
-                                                    id="summary-tab-{{ loop.index }}" 
-                                                    data-bs-toggle="tab" 
-                                                    data-bs-target="#summary-{{ loop.index }}" 
-                                                    type="button" 
-                                                    role="tab" 
-                                                    aria-controls="summary" 
-                                                    aria-selected="true">
-                                                Summary
-                                            </button>
-                                        </li>
-                                        {% if result.enhanced_data and (result.enhanced_data.equity_curve or result.enhanced_data.monthly_performance) %}
-                                        <li class="nav-item" role="presentation">
-                                            <button class="nav-link" 
-                                                    id="charts-tab-{{ loop.index }}" 
-                                                    data-bs-toggle="tab" 
-                                                    data-bs-target="#charts-{{ loop.index }}" 
-                                                    type="button" 
-                                                    role="tab" 
-                                                    aria-controls="charts" 
-                                                    aria-selected="false">
-                                                Charts
-                                            </button>
-                                        </li>
-                                        {% endif %}
-                                        {% if result.enhanced_data and result.enhanced_data.trade_stats %}
-                                        <li class="nav-item" role="presentation">
-                                            <button class="nav-link" 
-                                                    id="trades-tab-{{ loop.index }}" 
-                                                    data-bs-toggle="tab" 
-                                                    data-bs-target="#trades-{{ loop.index }}" 
-                                                    type="button" 
-                                                    role="tab" 
-                                                    aria-controls="trades" 
-                                                    aria-selected="false">
-                                                Trades
-                                            </button>
-                                        </li>
-                                        {% endif %}
-                                        {% if result.enhanced_data and result.enhanced_data.parameters %}
-                                        <li class="nav-item" role="presentation">
-                                            <button class="nav-link" 
-                                                    id="parameters-tab-{{ loop.index }}" 
-                                                    data-bs-toggle="tab" 
-                                                    data-bs-target="#parameters-{{ loop.index }}" 
-                                                    type="button" 
-                                                    role="tab" 
-                                                    aria-controls="parameters" 
-                                                    aria-selected="false">
-                                                Parameters
-                                            </button>
-                                        </li>
-                                        {% endif %}
-                                        {% if result.enhanced_data and result.enhanced_data.monte_carlo %}
-                                        <li class="nav-item" role="presentation">
-                                            <button class="nav-link" 
-                                                    id="monte-carlo-tab-{{ loop.index }}" 
-                                                    data-bs-toggle="tab" 
-                                                    data-bs-target="#monte-carlo-{{ loop.index }}" 
-                                                    type="button" 
-                                                    role="tab" 
-                                                    aria-controls="monte-carlo" 
-                                                    aria-selected="false">
-                                                Monte Carlo
-                                            </button>
-                                        </li>
-                                        {% endif %}
-                                    </ul>
-                                    
-                                    <!-- Tab Content -->
-                                    <div class="tab-content" id="metrics-content-{{ loop.index }}">
-                                        <!-- Summary Tab -->
-                                        <div class="tab-pane fade show active" 
-                                             id="summary-{{ loop.index }}" 
-                                             role="tabpanel" 
-                                             aria-labelledby="summary-tab-{{ loop.index }}">
-                                            <div class="metrics-container">
-                                                <h6>Performance Metrics:</h6>
-                                                <table class="table table-sm metrics-table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Metric</th>
-                                                            <th>Value</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% if result.metrics is mapping %}
-                                                            {% for metric, value in result.metrics.items() %}
-                                                                <tr>
-                                                                    <td>{{ metric }}</td>
-                                                                    <td>{{ "%.4f"|format(value) if value is number else value }}</td>
-                                                                </tr>
-                                                            {% endfor %}
-                                                        {% else %}
-                                                            <tr>
-                                                                <td colspan="2">
-                                                                    <div class="alert alert-warning">
-                                                                        Metrics data format not as expected. Raw data: {{ result.metrics }}
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        {% endif %}
-                                                    </tbody>
-                                                </table>
-                                                
-                                                {% if result.enhanced_data and result.enhanced_data.comparative %}
-                                                <div class="expandable-section mt-4">
-                                                    <div class="expandable-header">
-                                                        <h6 class="mb-0">In-Sample vs Out-of-Sample Comparison</h6>
-                                                        <i class="bi bi-chevron-down"></i>
-                                                    </div>
-                                                    <div class="expandable-content">
-                                                        <table class="table table-sm table-striped metrics-table">
-                                                            <thead>
-                                                                <tr>
-                                                                    <th>Metric</th>
-                                                                    <th>In-Sample</th>
-                                                                    <th>Out-of-Sample</th>
-                                                                    <th>Difference</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {% if result.enhanced_data.comparative is mapping %}
-                                                                    {% for metric, values in result.enhanced_data.comparative.items() %}
-                                                                        <tr>
-                                                                            <td>{{ metric }}</td>
-                                                                            {% if values is mapping and 'in_sample' in values and 'out_sample' in values %}
-                                                                                <td>{{ "%.4f"|format(values.in_sample) if values.in_sample is number else values.in_sample }}</td>
-                                                                                <td>{{ "%.4f"|format(values.out_sample) if values.out_sample is number else values.out_sample }}</td>
-                                                                                <td class="{{ 'text-danger' if values.in_sample > values.out_sample and values.in_sample > 0 else 'text-success' }}">
-                                                                                    {{ "%.4f"|format(values.out_sample - values.in_sample) if values.in_sample is number and values.out_sample is number else 'N/A' }}
-                                                                                </td>
-                                                                            {% else %}
-                                                                                <td colspan="3">
-                                                                                    <div class="alert alert-warning">
-                                                                                        Invalid comparative data format for this metric. Raw data: {{ values }}
-                                                                                    </div>
-                                                                                </td>
-                                                                            {% endif %}
-                                                                        </tr>
-                                                                    {% endfor %}
-                                                                {% else %}
-                                                                    <tr>
-                                                                        <td colspan="4">
-                                                                            <div class="alert alert-warning">
-                                                                                Data format not as expected. Raw data: {{ result.enhanced_data.comparative }}
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                {% endif %}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Charts Tab -->
-                                        {% if result.enhanced_data and (result.enhanced_data.equity_curve or result.enhanced_data.monthly_performance) %}
-                                        <div class="tab-pane fade" 
-                                             id="charts-{{ loop.index }}" 
-                                             role="tabpanel" 
-                                             aria-labelledby="charts-tab-{{ loop.index }}">
-                                            <div class="row">
-                                                {% if result.enhanced_data.equity_curve %}
-                                                <div class="col-md-12 mb-4">
-                                                    <h6>Equity Curve</h6>
-                                                    {% if result.enhanced_data.equity_curve.dates and result.enhanced_data.equity_curve.values %}
-                                                        <div class="chart-container">
-                                                            <canvas id="equity-chart-{{ loop.index }}" 
-                                                                {% if result.enhanced_data.equity_curve.dates and result.enhanced_data.equity_curve.values %}
-                                                                  {% with dates=result.enhanced_data.equity_curve.dates, values=result.enhanced_data.equity_curve.values %}
-                                                                  data-labels="{{ dates|tojson|default('[]') }}"
-                                                                  data-values="{{ values|tojson|default('[]') }}"
-                                                                  {% endwith %}
-                                                                {% else %}
-                                                                  data-labels="[]"
-                                                                  data-values="[]"
-                                                                {% endif %}></canvas>
-                                                        </div>
-                                                    {% else %}
-                                                        <div class="alert alert-warning">
-                                                            No equity curve data available.
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                                {% endif %}
-                                                
-                                                {% if result.enhanced_data.monthly_performance %}
-                                                <div class="col-md-12">
-                                                    <h6>Monthly Performance</h6>
-                                                    {% if result.enhanced_data.monthly_performance.months and result.enhanced_data.monthly_performance.values %}
-                                                        <div class="chart-container">
-                                                            <canvas id="monthly-chart-{{ loop.index }}"
-                                                                {% if result.enhanced_data.monthly_performance.months and result.enhanced_data.monthly_performance.values %}
-                                                                  {% with months=result.enhanced_data.monthly_performance.months, values=result.enhanced_data.monthly_performance.values %}
-                                                                  data-labels="{{ months|tojson|default('[]') }}"
-                                                                  data-values="{{ values|tojson|default('[]') }}"
-                                                                  {% endwith %}
-                                                                {% else %}
-                                                                  data-labels="[]"
-                                                                  data-values="[]"
-                                                                {% endif %}></canvas>
-                                                        </div>
-                                                    {% else %}
-                                                        <div class="alert alert-warning">
-                                                            No monthly performance data available.
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        {% endif %}
-                                        
-                                        <!-- Trades Tab -->
-                                        {% if result.enhanced_data and result.enhanced_data.trade_stats %}
-                                        <div class="tab-pane fade" 
-                                             id="trades-{{ loop.index }}" 
-                                             role="tabpanel" 
-                                             aria-labelledby="trades-tab-{{ loop.index }}">
-                                            <div class="row">
-                                                <div class="col-md-6">
-                                                    <h6>Trade Statistics</h6>
-                                                    <table class="table table-sm metrics-table">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td>Total Trades</td>
-                                                                <td>{{ result.enhanced_data.trade_stats.total_trades }}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Winning Trades</td>
-                                                                <td>{{ result.enhanced_data.trade_stats.winning_trades }}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Losing Trades</td>
-                                                                <td>{{ result.enhanced_data.trade_stats.losing_trades }}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Win Rate</td>
-                                                                <td>{{ "%.2f"|format(result.enhanced_data.trade_stats.win_rate * 100) }}%</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Average Win</td>
-                                                                <td>{{ "%.2f"|format(result.enhanced_data.trade_stats.avg_win) }}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Average Loss</td>
-                                                                <td>{{ "%.2f"|format(result.enhanced_data.trade_stats.avg_loss) }}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Win/Loss Ratio</td>
-                                                                <td>{{ "%.2f"|format(result.enhanced_data.trade_stats.win_loss_ratio) }}</td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                                
-                                                {% if result.enhanced_data.trade_stats.ticker_performance %}
-                                                <div class="col-md-6">
-                                                    <h6>Ticker Performance</h6>
-                                                    <div>
-                                                        {% if result.enhanced_data.trade_stats.ticker_performance is mapping %}
-                                                            {% for ticker, pnl in result.enhanced_data.trade_stats.ticker_performance.items() %}
-                                                                <span class="badge rounded-pill {{ 'bg-success' if pnl > 0 else 'bg-danger' }} ticker-pill">
-                                                                    {{ ticker }}: {{ "%.2f"|format(pnl) }}
-                                                                </span>
-                                                            {% endfor %}
-                                                        {% else %}
-                                                            <div class="alert alert-warning">
-                                                                Ticker performance data format not as expected. Raw data: {{ result.enhanced_data.trade_stats.ticker_performance }}
-                                                            </div>
-                                                        {% endif %}
-                                                    </div>
-                                                </div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        {% endif %}
-                                        
-                                        <!-- Parameters Tab -->
-                                        {% if result.enhanced_data and result.enhanced_data.parameters %}
-                                        <div class="tab-pane fade" 
-                                             id="parameters-{{ loop.index }}" 
-                                             role="tabpanel" 
-                                             aria-labelledby="parameters-tab-{{ loop.index }}">
-                                            <h6>Best Parameters</h6>
-                                            <table class="table table-sm metrics-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Parameter</th>
-                                                        <th>Value</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% if result.enhanced_data.parameters is mapping %}
-                                                        {% for param, value in result.enhanced_data.parameters.items() %}
-                                                            <tr>
-                                                                <td>{{ param }}</td>
-                                                                <td>{{ value }}</td>
-                                                            </tr>
-                                                        {% endfor %}
-                                                    {% else %}
-                                                        <tr>
-                                                            <td colspan="2">
-                                                                <div class="alert alert-warning">
-                                                                    Parameters data format not as expected. Raw data: {{ result.enhanced_data.parameters }}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    {% endif %}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        {% endif %}
-                                        
-                                        <!-- Monte Carlo Tab -->
-                                        {% if result.enhanced_data and result.enhanced_data.monte_carlo %}
-                                        <div class="tab-pane fade" 
-                                             id="monte-carlo-{{ loop.index }}" 
-                                             role="tabpanel" 
-                                             aria-labelledby="monte-carlo-tab-{{ loop.index }}">
-                                            <div class="row">
-                                                {% if result.enhanced_data.monte_carlo.p_values %}
-                                                <div class="col-md-6">
-                                                    <h6>Statistical Significance
-                                                        <i class="bi bi-info-circle tooltip-icon" 
-                                                           data-bs-toggle="tooltip" 
-                                                           title="P-values below 0.05 indicate statistically significant results"></i>
-                                                    </h6>
-                                                    <table class="table table-sm metrics-table">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Test</th>
-                                                                <th>P-Value</th>
-                                                                <th>Significant</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {% if result.enhanced_data.monte_carlo.p_values is mapping %}
-                                                                {% for test, p_value in result.enhanced_data.monte_carlo.p_values.items() %}
-                                                                    <tr>
-                                                                        <td>{{ test }}</td>
-                                                                        <td>{{ "%.4f"|format(p_value) }}</td>
-                                                                        <td>
-                                                                            {% if p_value < 0.05 %}
-                                                                                <span class="badge bg-success">Yes</span>
-                                                                            {% else %}
-                                                                                <span class="badge bg-danger">No</span>
-                                                                            {% endif %}
-                                                                        </td>
-                                                                    </tr>
-                                                                {% endfor %}
-                                                            {% else %}
-                                                                <tr>
-                                                                    <td colspan="3">
-                                                                        <div class="alert alert-warning">
-                                                                            P-values data format not as expected. Raw data: {{ result.enhanced_data.monte_carlo.p_values }}
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            {% endif %}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                                {% endif %}
-                                                
-                                                {% if result.enhanced_data.monte_carlo.metrics %}
-                                                <div class="col-md-6">
-                                                    <h6>Monte Carlo Metrics</h6>
-                                                    <table class="table table-sm metrics-table">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Metric</th>
-                                                                <th>Value</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {% if result.enhanced_data.monte_carlo.metrics is mapping %}
-                                                                {% for metric, value in result.enhanced_data.monte_carlo.metrics.items() %}
-                                                                    <tr>
-                                                                        <td>{{ metric }}</td>
-                                                                        <td>{{ "%.4f"|format(value) if value is number else value }}</td>
-                                                                    </tr>
-                                                                {% endfor %}
-                                                            {% else %}
-                                                                <tr>
-                                                                    <td colspan="2">
-                                                                        <div class="alert alert-warning">
-                                                                            Metrics data format not as expected. Raw data: {{ result.enhanced_data.monte_carlo.metrics }}
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            {% endif %}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    
-                                    <div class="text-end mt-3">
-                                        <a href="/home/pyzron02/trading-strategy-backtester/output/{{ result.folder }}" 
-                                           class="btn btn-sm btn-primary" 
-                                           onclick="alert('Results folder: /home/pyzron02/trading-strategy-backtester/output/{{ result.folder }}'); return false;">
-                                            View Full Results
-                                        </a>
-                                    </div>
-                                {% endif %}
+                                <p class="mb-2">Result Location: <code>{{ folder.name }}</code></p>
+                                <div class="d-grid gap-2">
+                                    <a href="{{ url_for('view_result', folder_name=folder.name) }}" class="btn btn-primary">View Results</a>
+                                    <a href="{{ url_for('view_log', folder_name=folder.name) }}" class="btn btn-outline-secondary">View Logs</a>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -620,94 +127,74 @@
             </div>
         {% else %}
             <div class="alert alert-info">
-                <p>No backtest results found. Run a backtest to generate results.</p>
-                <a href="{{ url_for('index') }}" class="btn btn-primary mt-2">Run a Backtest</a>
+                <h4 class="alert-heading">No Results Found</h4>
+                <p>There are no backtest results available. Run a backtest to see results here.</p>
+                <hr>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">Run a Backtest</a>
             </div>
         {% endif %}
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-    <script src="/static/js/dashboard.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Check for running backtests every 5 seconds
-            if (document.querySelectorAll('.running').length > 0) {
-                setInterval(checkBacktestStatus, 5000);
-            }
-            
-            // Set up cancel buttons
-            document.querySelectorAll('.cancel-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const jobId = this.getAttribute('data-job-id');
-                    cancelBacktest(jobId);
-                });
-            });
-            
-            // Auto-dismiss flash messages after 5 seconds
-            setTimeout(function() {
-                const alerts = document.querySelectorAll('.alert-container .alert');
-                alerts.forEach(alert => {
-                    const bsAlert = new bootstrap.Alert(alert);
-                    bsAlert.close();
-                });
-            }, 5000);
-            
-            // Initialize the dashboard components
-            initializeMetricsTabs();
-            initializeExpandableSections();
-            initializeTooltips();
-            loadCharts();
-            
-            function checkBacktestStatus() {
-                const statusUpdates = document.getElementById('status-updates');
-                statusUpdates.classList.remove('d-none');
+            // Filter functionality
+            const strategyFilter = document.getElementById('strategy-filter');
+            const workflowFilter = document.getElementById('workflow-filter');
+            const dateFilter = document.getElementById('date-filter');
+            const resetFilter = document.getElementById('reset-filter');
+            const resultItems = document.querySelectorAll('.result-item');
+
+            function applyFilters() {
+                const strategy = strategyFilter.value;
+                const workflow = workflowFilter.value;
+                const date = dateFilter.value;
                 
-                fetch('/backtest_status')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            if (data.status.length === 0) {
-                                // No running backtests, reload the page
-                                window.location.reload();
-                            } else {
-                                // Some backtests are still running, check if any have finished
-                                const completed = data.status.filter(job => job.status !== 'Running');
-                                if (completed.length > 0) {
-                                    // Some backtests have finished, reload the page
-                                    window.location.reload();
-                                }
-                            }
-                        }
-                        statusUpdates.classList.add('d-none');
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        statusUpdates.classList.add('d-none');
-                    });
+                resultItems.forEach(item => {
+                    const itemStrategy = item.getAttribute('data-strategy');
+                    const itemWorkflow = item.getAttribute('data-workflow');
+                    const itemTimestamp = item.getAttribute('data-timestamp');
+                    
+                    let show = true;
+                    
+                    if (strategy && itemStrategy !== strategy) {
+                        show = false;
+                    }
+                    
+                    if (workflow && !itemWorkflow.includes(workflow)) {
+                        show = false;
+                    }
+                    
+                    if (date && !itemTimestamp.includes(date)) {
+                        show = false;
+                    }
+                    
+                    item.style.display = show ? '' : 'none';
+                });
+            }
+
+            if (strategyFilter) {
+                strategyFilter.addEventListener('change', applyFilters);
             }
             
-            function cancelBacktest(jobId) {
-                if (confirm("Are you sure you want to cancel this backtest?")) {
-                    fetch(`/cancel_backtest/${jobId}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            window.location.reload();
-                        } else {
-                            alert('Error: ' + data.error);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Error: ' + error);
+            if (workflowFilter) {
+                workflowFilter.addEventListener('change', applyFilters);
+            }
+            
+            if (dateFilter) {
+                dateFilter.addEventListener('input', applyFilters);
+            }
+            
+            if (resetFilter) {
+                resetFilter.addEventListener('click', function() {
+                    strategyFilter.value = '';
+                    workflowFilter.value = '';
+                    dateFilter.value = '';
+                    
+                    resultItems.forEach(item => {
+                        item.style.display = '';
                     });
-                }
+                });
             }
         });
     </script>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Viewer - {{ folder_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            max-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .log-container {
+            margin-bottom: 30px;
+        }
+        .alert-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="pb-3 mb-4 border-bottom">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="display-5 fw-bold">Logs <span class="fs-4 text-muted">{{ folder_name }}</span></h1>
+                <div>
+                    <a href="{{ url_for('view_result', folder_name=folder_name) }}" class="btn btn-outline-primary me-2">Back to Results</a>
+                    <a href="{{ url_for('results') }}" class="btn btn-outline-secondary">All Results</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="alert-container">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        {% if logs %}
+            {% for log in logs %}
+                <div class="card mb-4 log-container">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{{ log.name }}</h5>
+                        <button class="btn btn-sm btn-outline-secondary copy-btn" data-log-id="log-{{ loop.index }}">Copy</button>
+                    </div>
+                    <div class="card-body">
+                        <pre id="log-{{ loop.index }}">{{ log.content }}</pre>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-info">
+                <h4 class="alert-heading">No Logs Found</h4>
+                <p>No log files were found for this backtest run.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Copy functionality for log content
+            const copyButtons = document.querySelectorAll('.copy-btn');
+            copyButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const logId = this.getAttribute('data-log-id');
+                    const logElement = document.getElementById(logId);
+                    
+                    // Create temporary element for copying
+                    const textArea = document.createElement('textarea');
+                    textArea.value = logElement.textContent;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    
+                    try {
+                        // Copy text to clipboard
+                        document.execCommand('copy');
+                        
+                        // Give visual feedback
+                        const originalText = this.textContent;
+                        this.textContent = 'Copied!';
+                        this.classList.remove('btn-outline-secondary');
+                        this.classList.add('btn-success');
+                        
+                        // Restore original button after 2 seconds
+                        setTimeout(() => {
+                            this.textContent = originalText;
+                            this.classList.remove('btn-success');
+                            this.classList.add('btn-outline-secondary');
+                        }, 2000);
+                    } catch (err) {
+                        console.error('Failed to copy: ', err);
+                    }
+                    
+                    // Remove temporary element
+                    document.body.removeChild(textArea);
+                });
+            });
+        });
+    </script>
+</body>
+</html> 
