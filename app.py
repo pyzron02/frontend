@@ -675,10 +675,36 @@ def run_backtest():
         output_thread.daemon = True
         output_thread.start()
         
+        # Create a thread to wait for process completion and cleanup config file
+        def cleanup_process():
+            # Wait for process to complete
+            return_code = process.wait()
+            print(f"Backtest process completed with return code: {return_code}")
+            
+            # Delete the config file after backtest is complete
+            try:
+                if os.path.exists(config_file):
+                    os.remove(config_file)
+                    print(f"Cleaned up config file: {config_file}")
+            except Exception as e:
+                print(f"Error removing config file: {str(e)}")
+        
+        cleanup_thread = threading.Thread(target=cleanup_process)
+        cleanup_thread.daemon = True
+        cleanup_thread.start()
+        
         # Return success and redirect to results page
         return redirect(url_for('results'))
         
     except Exception as e:
+        # If there's an error starting the process, clean up the config file
+        try:
+            if os.path.exists(config_file):
+                os.remove(config_file)
+                print(f"Cleaned up config file after error: {config_file}")
+        except Exception:
+            pass
+            
         flash(f"Error running backtest: {str(e)}")
         return redirect(url_for('index'))
 
@@ -691,8 +717,80 @@ def serve_image(image_path):
     else:
         return f"Image not found: {image_path}", 404
 
+@app.route('/cleanup_configs')
+def cleanup_configs():
+    """Admin utility to clean up old config files"""
+    if not request.remote_addr == '127.0.0.1':
+        return "Access denied", 403
+        
+    config_dir = os.path.join(project_root, 'input', 'workflow_configs')
+    if not os.path.exists(config_dir):
+        return "Config directory not found", 404
+    
+    deleted_count = 0
+    error_count = 0
+    config_files = []
+    
+    # List all config files
+    for file in os.listdir(config_dir):
+        if file.endswith('.json'):
+            file_path = os.path.join(config_dir, file)
+            file_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(file_path))
+            
+            # Keep track of files
+            config_files.append({
+                'name': file,
+                'path': file_path,
+                'age_hours': file_age.total_seconds() / 3600
+            })
+    
+    # Delete files older than 24 hours
+    for file_info in config_files:
+        if file_info['age_hours'] > 24:
+            try:
+                os.remove(file_info['path'])
+                deleted_count += 1
+            except Exception:
+                error_count += 1
+    
+    return jsonify({
+        'status': 'success',
+        'message': f'Deleted {deleted_count} old config files, {error_count} errors',
+        'remaining_files': len(config_files) - deleted_count
+    })
+
 if __name__ == '__main__':
     # Create temp directory for temporary files
     os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp'), exist_ok=True)
+    
+    # Clean up old config files on startup
+    def cleanup_old_configs():
+        """Clean up old config files on startup"""
+        try:
+            config_dir = os.path.join(project_root, 'input', 'workflow_configs')
+            if not os.path.exists(config_dir):
+                return
+            
+            deleted_count = 0
+            for file in os.listdir(config_dir):
+                if file.endswith('.json'):
+                    file_path = os.path.join(config_dir, file)
+                    file_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(file_path))
+                    
+                    # Delete files older than 24 hours
+                    if file_age.total_seconds() > 86400:  # 24 hours
+                        try:
+                            os.remove(file_path)
+                            deleted_count += 1
+                        except Exception as e:
+                            print(f"Error deleting old config file {file_path}: {str(e)}")
+            
+            if deleted_count > 0:
+                print(f"Startup cleanup: Removed {deleted_count} old config files")
+        except Exception as e:
+            print(f"Error during startup config cleanup: {str(e)}")
+    
+    # Run cleanup
+    cleanup_old_configs()
     
     app.run(debug=True, host='0.0.0.0', port=5000) 
