@@ -463,7 +463,7 @@ def get_monte_carlo_charts(folder_path):
     
     # Function to check if a file is a monte carlo related chart
     def is_monte_carlo_chart(filename):
-        return filename.endswith('.png') and any(x in filename.lower() for x in 
+        return (filename.endswith('.html') or filename.endswith('.png')) and any(x in filename.lower() for x in 
                                               ['monte_carlo', 'return_distribution', 'drawdown', 'dashboard'])
     
     # Check main directory first
@@ -474,7 +474,8 @@ def get_monte_carlo_charts(folder_path):
                 print(f"Found chart: {file_path}")
                 charts.append({
                     'name': file,
-                    'path': file_path
+                    'path': file_path,
+                    'type': 'html' if file.endswith('.html') else 'png'
                 })
     
     # Look for specific directory names that might contain charts
@@ -490,7 +491,8 @@ def get_monte_carlo_charts(folder_path):
                         print(f"Found chart: {file_path}")
                         charts.append({
                             'name': file,
-                            'path': file_path
+                            'path': file_path,
+                            'type': 'html' if file.endswith('.html') else 'png'
                         })
     
     # Check all subdirectories (recursive)
@@ -507,7 +509,8 @@ def get_monte_carlo_charts(folder_path):
                             print(f"Found chart: {file_path}")
                             charts.append({
                                 'name': file,
-                                'path': file_path
+                                'path': file_path,
+                                'type': 'html' if file.endswith('.html') else 'png'
                             })
                 
                 # Check one level deeper (for nested output directories)
@@ -522,11 +525,39 @@ def get_monte_carlo_charts(folder_path):
                                     print(f"Found chart: {file_path}")
                                     charts.append({
                                         'name': file,
-                                        'path': file_path
+                                        'path': file_path,
+                                        'type': 'html' if file.endswith('.html') else 'png'
                                     })
     
-    print(f"Found {len(charts)} Monte Carlo charts")
-    return charts
+    # First separate charts by their base name (without extension)
+    chart_groups = {}
+    for chart in charts:
+        base_name = chart['name'].replace('.html', '').replace('.png', '')
+        if base_name not in chart_groups:
+            chart_groups[base_name] = []
+        chart_groups[base_name].append(chart)
+    
+    # Then prioritize HTML files over PNG for each base name
+    prioritized_charts = []
+    for base_name, chart_list in chart_groups.items():
+        # Find HTML files first
+        html_charts = [c for c in chart_list if c['type'] == 'html']
+        if html_charts:
+            # If HTML version exists, use it
+            prioritized_charts.append(html_charts[0])
+            print(f"Selected HTML version of {base_name}")
+        else:
+            # Otherwise use PNG version
+            png_charts = [c for c in chart_list if c['type'] == 'png']
+            if png_charts:
+                prioritized_charts.append(png_charts[0])
+                print(f"Selected PNG version of {base_name} (HTML not available)")
+    
+    print(f"Found {len(charts)} total charts, selected {len(prioritized_charts)} prioritized charts")
+    for chart in prioritized_charts:
+        print(f"Selected chart: {chart['name']} ({chart['type']})")
+    
+    return prioritized_charts
 
 def get_equity_curve_description(workflow_type):
     """Get description of equity curve based on workflow type"""
@@ -1006,14 +1037,14 @@ def run_backtest():
         flash(f"Error running backtest: {str(e)}")
         return redirect(url_for('index'))
 
-@app.route('/image/<path:image_path>')
-def serve_image(image_path):
-    """Serve an image file"""
-    full_path = os.path.join(project_root, image_path)
+@app.route('/file/<path:file_path>')
+def serve_file(file_path):
+    """Serve any static file (images, HTML, etc.)"""
+    full_path = os.path.join(project_root, file_path)
     if os.path.exists(full_path):
         return send_file(full_path)
     else:
-        return f"Image not found: {image_path}", 404
+        return f"File not found: {file_path}", 404
 
 @app.route('/cleanup_configs')
 def cleanup_configs():

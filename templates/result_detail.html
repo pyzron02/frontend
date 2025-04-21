@@ -189,7 +189,7 @@
                                                 <h6 class="mb-0">{{ plot.name|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace('.svg', '')|replace('.pdf', '')|replace('_', ' ')|title }}</h6>
                                             </div>
                                             <div class="card-body text-center">
-                                                <img src="{{ url_for('serve_image', image_path=plot.path.replace(project_root, '').lstrip('/')) }}" 
+                                                <img src="{{ url_for('serve_file', file_path=plot.path.replace(project_root, '').lstrip('/')) }}" 
                                                      alt="{{ plot.name }}" 
                                                      class="img-fluid"
                                                      style="max-height: 500px; max-width: 100%;"
@@ -331,7 +331,7 @@
                 <!-- First find and display the dashboard image if available -->
                 {% set dashboard_found = false %}
                 {% for chart in monte_carlo_charts %}
-                    {% if 'dashboard' in chart.name.lower() %}
+                    {% if 'dashboard' in chart.name.lower() or 'monte_carlo_dashboard' in chart.path.lower() %}
                         {% set dashboard_found = true %}
                         <div class="row mb-4">
                             <div class="col-md-12">
@@ -340,11 +340,21 @@
                                         <h5 class="mb-0">Monte Carlo Dashboard</h5>
                                     </div>
                                     <div class="card-body text-center">
-                                        <img src="{{ url_for('serve_image', image_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                        {% if chart.type == 'html' %}
+                                        <div class="ratio ratio-16x9">
+                                            <iframe src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                    title="Monte Carlo Dashboard"
+                                                    class="w-100"
+                                                    style="height: 800px; border: 1px solid #ddd; border-radius: 4px;"
+                                                    allowfullscreen></iframe>
+                                        </div>
+                                        {% else %}
+                                        <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
                                              alt="Monte Carlo Dashboard" 
                                              class="img-fluid"
                                              style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
                                              onerror="this.onerror=null; this.src=''; this.alt='Dashboard image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Dashboard image not found</div>'">
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -352,52 +362,68 @@
                     {% endif %}
                 {% endfor %}
                 
-                <!-- Create tabs for other Monte Carlo visualizations -->
+                <!-- Create tabs for other Monte Carlo visualizations with revised implementation -->
                 <div class="card">
                     <div class="card-header">
                         <h5 class="mb-0">Monte Carlo Visualizations</h5>
                     </div>
                     <div class="card-body">
-                        <ul class="nav nav-tabs mb-3" id="monteCarloVisualizations" role="tablist">
+                        <!-- Tab navigation with unique ID -->
+                        <ul class="nav nav-tabs mb-3" id="mcVisualizationTabs" role="tablist">
                             {% set first_tab = true %}
                             {% for chart in monte_carlo_charts %}
-                                {% if 'dashboard' not in chart.name.lower() %}
+                                {% if not ('dashboard' in chart.name.lower() or 'monte_carlo_dashboard' in chart.path.lower()) %}
+                                    {% set chart_id = chart.name|replace('.png', '')|replace('.html', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower|replace('.', '_') %}
                                     <li class="nav-item" role="presentation">
-                                        {% set chart_id = chart.name|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower %}
                                         <button class="nav-link {% if first_tab %}active{% endif %}" 
-                                                id="{{ chart_id }}-tab" 
+                                                id="mc-{{ chart_id }}-tab" 
                                                 data-bs-toggle="tab" 
-                                                data-bs-target="#{{ chart_id }}-content" 
+                                                data-bs-target="#mc-{{ chart_id }}-content" 
                                                 type="button" 
                                                 role="tab" 
-                                                aria-controls="{{ chart_id }}-content" 
+                                                aria-controls="mc-{{ chart_id }}-content" 
                                                 aria-selected="{% if first_tab %}true{% else %}false{% endif %}">
-                                            {{ chart.name|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace('_', ' ')|title }}
+                                            {{ chart.name|replace('.png', '')|replace('.html', '')|replace('.jpg', '')|replace('.jpeg', '')|replace('_', ' ')|title }}
                                         </button>
                                     </li>
-                                    {% set first_tab = false %}
+                                    {% if first_tab %}
+                                        {% set first_tab = false %}
+                                    {% endif %}
                                 {% endif %}
                             {% endfor %}
                         </ul>
                         
-                        <div class="tab-content" id="monteCarloVisualizationsContent">
+                        <!-- Tab content with unique ID -->
+                        <div class="tab-content" id="mcVisualizationsContent">
                             {% set first_tab = true %}
                             {% for chart in monte_carlo_charts %}
-                                {% if 'dashboard' not in chart.name.lower() %}
-                                    {% set chart_id = chart.name|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower %}
+                                {% if not ('dashboard' in chart.name.lower() or 'monte_carlo_dashboard' in chart.path.lower()) %}
+                                    {% set chart_id = chart.name|replace('.png', '')|replace('.html', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower|replace('.', '_') %}
                                     <div class="tab-pane fade {% if first_tab %}show active{% endif %}" 
-                                         id="{{ chart_id }}-content" 
+                                         id="mc-{{ chart_id }}-content" 
                                          role="tabpanel" 
-                                         aria-labelledby="{{ chart_id }}-tab">
+                                         aria-labelledby="mc-{{ chart_id }}-tab">
                                         <div class="text-center">
-                                            <img src="{{ url_for('serve_image', image_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                            {% if chart.type == 'html' %}
+                                            <div class="ratio ratio-16x9">
+                                                <iframe src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                        title="{{ chart.name }}"
+                                                        class="w-100"
+                                                        style="border: 1px solid #ddd; border-radius: 4px; height: 600px;"
+                                                        allowfullscreen></iframe>
+                                            </div>
+                                            {% else %}
+                                            <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
                                                  alt="{{ chart.name }}" 
                                                  class="img-fluid"
                                                  style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
                                                  onerror="this.onerror=null; this.src=''; this.alt='Image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Chart image not found</div>'">
+                                            {% endif %}
                                         </div>
                                     </div>
-                                    {% set first_tab = false %}
+                                    {% if first_tab %}
+                                        {% set first_tab = false %}
+                                    {% endif %}
                                 {% endif %}
                             {% endfor %}
                         </div>
@@ -425,6 +451,51 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize all Bootstrap tabs
+            const tabElements = document.querySelectorAll('[data-bs-toggle="tab"]');
+            tabElements.forEach(tab => {
+                new bootstrap.Tab(tab);
+            });
+            
+            // Add specific activation for Monte Carlo tabs to ensure they work
+            document.querySelectorAll('#mcVisualizationTabs .nav-link').forEach(function(tabEl) {
+                tabEl.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    
+                    // Hide all tab contents
+                    document.querySelectorAll('#mcVisualizationsContent .tab-pane').forEach(function(contentEl) {
+                        contentEl.classList.remove('show', 'active');
+                    });
+                    
+                    // Deactivate all tabs
+                    document.querySelectorAll('#mcVisualizationTabs .nav-link').forEach(function(tab) {
+                        tab.classList.remove('active');
+                        tab.setAttribute('aria-selected', 'false');
+                    });
+                    
+                    // Activate clicked tab
+                    this.classList.add('active');
+                    this.setAttribute('aria-selected', 'true');
+                    
+                    // Show corresponding content
+                    const target = this.getAttribute('data-bs-target');
+                    const content = document.querySelector(target);
+                    if (content) {
+                        content.classList.add('show', 'active');
+                    }
+                });
+            });
+            
+            // Ensure first Monte Carlo tab is active on page load
+            const firstMcTab = document.querySelector('#mcVisualizationTabs .nav-link.active');
+            if (firstMcTab) {
+                const target = firstMcTab.getAttribute('data-bs-target');
+                const content = document.querySelector(target);
+                if (content) {
+                    content.classList.add('show', 'active');
+                }
+            }
+            
             {% if equity_curve and equity_curve.dates and equity_curve.equity and equity_curve.dates|length > 0 and equity_curve.equity|length > 0 %}
             // Render equity curve chart
             const equityCtx = document.getElementById('equityCurveChart');
