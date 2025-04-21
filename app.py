@@ -578,7 +578,7 @@ def run_backtest():
             "tickers": tickers,
             "initial_capital": initial_capital,
             "commission": 0.001,
-            "plot": True,
+            "plot": False,
             "enhanced_plots": True if workflow_type in ["monte_carlo", "complete"] else False,
             "verbose": request.form.get('verbose') == 'on'
         },
