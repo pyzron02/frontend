@@ -136,64 +136,6 @@ def get_equity_curve(folder_path):
     """Get equity curve CSV if available"""
     print(f"Looking for equity curve in {folder_path}")
     
-    def standardize_equity_curve(df):
-        """Standardize equity curve dataframe to have consistent columns"""
-        # Make a copy to avoid modifying the original
-        df = df.copy()
-        
-        # Ensure basic columns exist
-        required_columns = ['date', 'equity']
-        
-        # Check and format date column
-        if 'date' not in df.columns and 'timestamp' in df.columns:
-            df['date'] = df['timestamp']
-        elif 'date' not in df.columns:
-            print("Warning: No date or timestamp column found in equity curve")
-            # Create a date column based on index if missing
-            df['date'] = pd.date_range(start='2020-01-01', periods=len(df), freq='D')
-        
-        # Ensure dates are properly formatted
-        df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
-        
-        # Ensure equity column exists
-        if 'equity' not in df.columns and 'portfolio_value' in df.columns:
-            df['equity'] = df['portfolio_value']
-        elif 'equity' not in df.columns and 'account_value' in df.columns:
-            df['equity'] = df['account_value']
-        elif 'equity' not in df.columns and 'balance' in df.columns:
-            df['equity'] = df['balance']
-            
-        # Calculate PnL if not present
-        if 'pnl' not in df.columns and 'equity' in df.columns:
-            # Calculate daily PnL
-            df['pnl'] = df['equity'].diff()
-            # Set first day PnL
-            if len(df) > 0:
-                initial_capital = df['equity'].iloc[0]
-                df.loc[df.index[0], 'pnl'] = df['equity'].iloc[0] - initial_capital
-        
-        # Calculate cumulative PnL if not present
-        if 'cumulative_pnl' not in df.columns and 'pnl' in df.columns:
-            df['cumulative_pnl'] = df['pnl'].cumsum()
-        
-        # Calculate drawdown if not present
-        if 'drawdown' not in df.columns and 'equity' in df.columns:
-            rolling_max = df['equity'].cummax()
-            df['drawdown'] = (df['equity'] - rolling_max) / rolling_max * 100  # as percentage
-        
-        # Calculate returns if not present
-        if 'returns' not in df.columns and 'equity' in df.columns:
-            df['returns'] = df['equity'].pct_change() * 100  # as percentage
-            df.loc[df.index[0], 'returns'] = 0
-        
-        # Calculate cumulative returns if not present
-        if 'cumulative_returns' not in df.columns and 'equity' in df.columns:
-            initial_equity = df['equity'].iloc[0] if len(df) > 0 else 1
-            df['cumulative_returns'] = (df['equity'] / initial_equity - 1) * 100  # as percentage
-        
-        print(f"Standardized equity curve with columns: {df.columns.tolist()}")
-        return df
-    
     # First look in main directory
     for file in os.listdir(folder_path):
         if file == 'equity_curve.csv':
@@ -203,8 +145,10 @@ def get_equity_curve(folder_path):
                     print(f"Found equity curve at {curve_path}")
                     df = pd.read_csv(curve_path)
                     
-                    # Standardize columns
-                    df = standardize_equity_curve(df)
+                    # Ensure dates are properly formatted
+                    if 'date' in df.columns:
+                        # Make dates JSON serializable
+                        df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
                     
                     dates = df['date'].tolist() if 'date' in df.columns else []
                     equity = df['equity'].tolist() if 'equity' in df.columns else []
@@ -235,8 +179,10 @@ def get_equity_curve(folder_path):
                             print(f"Found equity curve at {curve_path}")
                             df = pd.read_csv(curve_path)
                             
-                            # Standardize columns
-                            df = standardize_equity_curve(df)
+                            # Ensure dates are properly formatted
+                            if 'date' in df.columns:
+                                # Make dates JSON serializable
+                                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
                             
                             dates = df['date'].tolist() if 'date' in df.columns else []
                             equity = df['equity'].tolist() if 'equity' in df.columns else []
@@ -266,8 +212,10 @@ def get_equity_curve(folder_path):
                             print(f"Found equity curve at {curve_path}")
                             df = pd.read_csv(curve_path)
                             
-                            # Standardize columns
-                            df = standardize_equity_curve(df)
+                            # Ensure dates are properly formatted
+                            if 'date' in df.columns:
+                                # Make dates JSON serializable
+                                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
                             
                             dates = df['date'].tolist() if 'date' in df.columns else []
                             equity = df['equity'].tolist() if 'equity' in df.columns else []
