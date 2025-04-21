@@ -391,6 +391,46 @@ def get_monte_carlo_charts(folder_path):
     print(f"Found {len(charts)} Monte Carlo charts")
     return charts
 
+def get_equity_curve_description(workflow_type):
+    """Get description of equity curve based on workflow type"""
+    if workflow_type == "simple":
+        return """
+        <h5>Simple Workflow Equity Curve</h5>
+        <p>This equity curve represents the actual balance of your trading account over time. 
+        Each point corresponds to a day/timestamp in the backtest period, showing how your capital 
+        would have grown or declined based on the trading strategy with fixed parameters.</p>
+        """
+    elif workflow_type == "optimization":
+        return """
+        <h5>Optimization Workflow Equity Curve</h5>
+        <p>This equity curve shows the performance of your strategy with the <strong>best parameters</strong> 
+        found during optimization. After testing many parameter combinations, the optimizer selected 
+        the parameters that maximize your chosen metric (Sharpe ratio, total return, etc.). This curve 
+        demonstrates how those optimal parameters would have performed historically.</p>
+        """
+    elif workflow_type == "monte_carlo":
+        return """
+        <h5>Monte Carlo Workflow Equity Curve</h5>
+        <p>This equity curve represents the <strong>average or median</strong> equity path across 
+        multiple simulations. In Monte Carlo analysis, the price data is randomized/permuted to test 
+        strategy robustness. This gives a more realistic picture of expected performance by accounting 
+        for market randomness. Check the Monte Carlo tab for the distribution of possible outcomes.</p>
+        """
+    elif workflow_type == "complete":
+        return """
+        <h5>Complete Workflow Equity Curve</h5>
+        <p>This equity curve combines the benefits of both optimization and Monte Carlo testing. 
+        It shows the performance of optimized parameters that have also been validated through 
+        Monte Carlo simulations. This is the most comprehensive view of how your strategy might 
+        perform in real market conditions.</p>
+        """
+    else:
+        return """
+        <h5>Equity Curve</h5>
+        <p>This chart shows the growth of your trading account over the backtest period based on 
+        the strategy's trades. It's a visual representation of cumulative performance over time.</p>
+        """
+
 @app.route('/')
 def index():
     """Landing page with form to execute backtests"""
@@ -483,6 +523,9 @@ def view_result(folder_name):
         optimization_results = get_optimization_results(folder_path)
         monte_carlo_charts = get_monte_carlo_charts(folder_path)
         
+        # Get equity curve description based on workflow type
+        equity_curve_description = get_equity_curve_description(workflow_type)
+        
         return render_template(
             'result_detail.html',
             folder_name=folder_name,
@@ -495,7 +538,8 @@ def view_result(folder_name):
             trade_log=trade_log,
             optimization_results=optimization_results,
             monte_carlo_charts=monte_carlo_charts,
-            project_root=project_root
+            project_root=project_root,
+            equity_curve_description=equity_curve_description
         )
     except Exception as e:
         print(f"Error viewing result {folder_name}: {str(e)}")

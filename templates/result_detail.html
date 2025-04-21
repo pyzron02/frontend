@@ -166,6 +166,11 @@
                                 <h5 class="mb-0">Equity Curve</h5>
                             </div>
                             <div class="card-body">
+                                <!-- Description of equity curve based on workflow type -->
+                                <div class="alert alert-info mb-4">
+                                    {{ equity_curve_description|safe }}
+                                </div>
+                                
                                 {% if equity_curve.dates and equity_curve.equity and equity_curve.dates|length > 0 and equity_curve.equity|length > 0 %}
                                 <div class="chart-container">
                                     <canvas id="equityCurveChart"></canvas>
