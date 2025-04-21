@@ -484,10 +484,8 @@ def strategy_params(strategy_name):
     elif strategy_name == "MultiPosition":
         return jsonify({
             "parameters": {
-                "short_ma": {"type": "int", "default": 5, "min": 2, "max": 20, "description": "Short MA period"},
-                "medium_ma": {"type": "int", "default": 20, "min": 10, "max": 50, "description": "Medium MA period"},
-                "long_ma": {"type": "int", "default": 50, "min": 30, "max": 200, "description": "Long MA period"},
-                "position_pct": {"type": "float", "default": 0.1, "min": 0.01, "max": 0.5, "description": "Position size as percentage"},
+                "sma_period": {"type": "int", "default": 20, "min": 5, "max": 200, "description": "SMA period"},
+                "position_size": {"type": "int", "default": 100, "min": 10, "max": 1000, "description": "Position size"},
                 "max_positions": {"type": "int", "default": 5, "min": 1, "max": 10, "description": "Maximum positions"}
             }
         })
@@ -591,6 +589,19 @@ def run_backtest():
     parameters = {}
     parameter_grid = {}
     
+    # Define parameter mappings for each strategy to ensure names match what the strategy expects
+    parameter_mappings = {
+        "MultiPosition": {
+            # No mappings needed now that we've fixed the frontend parameter names
+        },
+        "MACrossover": {
+            # No mappings needed 
+        },
+        "AuctionMarket": {
+            # No mappings needed
+        }
+    }
+    
     # Extract single parameters
     for key, value in request.form.items():
         if key.startswith('param_'):
@@ -609,10 +620,23 @@ def run_backtest():
                 except ValueError:
                     parameters[param_name] = value
     
+    # Apply parameter mappings if any
+    if strategy in parameter_mappings:
+        for old_name, new_name in parameter_mappings[strategy].items():
+            if old_name in parameters:
+                parameters[new_name] = parameters.pop(old_name)
+                print(f"Mapping parameter: {old_name} -> {new_name}")
+    
     # Extract grid parameters for optimization
     for key, value in request.form.items():
         if key.startswith('grid_'):
             param_name = key[5:]  # Remove 'grid_' prefix
+            
+            # Apply parameter mappings for grid parameters if any
+            if strategy in parameter_mappings:
+                if param_name in parameter_mappings[strategy]:
+                    param_name = parameter_mappings[strategy][param_name]
+                    print(f"Mapping grid parameter: {key[5:]} -> {param_name}")
             
             # Split the values by comma and convert
             try:
@@ -642,6 +666,7 @@ def run_backtest():
     if workflow_type in ['optimization', 'complete']:
         if parameter_grid:
             config["strategies"][strategy]["parameter_grid"] = parameter_grid
+            print(f"Using parameter grid: {parameter_grid}")
         else:
             # If no grid specified but optimization workflow, convert single params to grid
             grid = {}
@@ -658,10 +683,12 @@ def run_backtest():
                     grid[key] = [value]
             
             config["strategies"][strategy]["parameter_grid"] = grid
+            print(f"Created parameter grid: {grid}")
             flash("Created parameter grid for optimization based on single parameters.")
     else:
         # For non-optimization workflows, use single parameters
         config["strategies"][strategy]["parameters"] = parameters
+        print(f"Using parameters: {parameters}")
     
     # Add specific parameters for different workflow types
     if workflow_type in ['optimization', 'complete']:
