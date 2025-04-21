@@ -145,7 +145,15 @@
                                         <h5 class="mb-0">{{ summary.name }}</h5>
                                     </div>
                                     <div class="card-body">
-                                        <pre class="mb-0"><code>{{ summary.content }}</code></pre>
+                                        {% if summary.type == 'monte_carlo' %}
+                                            <!-- Simple Raw Monte Carlo Summary Display -->
+                                            <div class="monte-carlo-summary">
+                                                <pre class="mb-0"><code>{{ summary.content }}</code></pre>
+                                            </div>
+                                        {% else %}
+                                            <!-- Standard summary display -->
+                                            <pre class="mb-0"><code>{{ summary.content }}</code></pre>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -171,11 +179,34 @@
                                     {{ equity_curve_description|safe }}
                                 </div>
                                 
-                                {% if equity_curve.dates and equity_curve.equity and equity_curve.dates|length > 0 and equity_curve.equity|length > 0 %}
+                                <!-- Display workflow-generated plots if available -->
+                                {% if equity_plots and equity_plots|length > 0 %}
+                                <div class="row">
+                                    {% for plot in equity_plots %}
+                                    <div class="col-md-12 mb-4">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">{{ plot.name|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace('.svg', '')|replace('.pdf', '')|replace('_', ' ')|title }}</h6>
+                                            </div>
+                                            <div class="card-body text-center">
+                                                <img src="{{ url_for('serve_image', image_path=plot.path.replace(project_root, '').lstrip('/')) }}" 
+                                                     alt="{{ plot.name }}" 
+                                                     class="img-fluid"
+                                                     style="max-height: 500px; max-width: 100%;"
+                                                     onerror="this.onerror=null; this.src=''; this.alt='Image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Plot image not found or cannot be displayed</div>'">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Show basic equity curve chart if plots aren't available or as a fallback -->
+                                {% if (not equity_plots or equity_plots|length == 0) and equity_curve.dates and equity_curve.equity and equity_curve.dates|length > 0 and equity_curve.equity|length > 0 %}
                                 <div class="chart-container">
                                     <canvas id="equityCurveChart"></canvas>
                                 </div>
-                                {% else %}
+                                {% elif not equity_plots or equity_plots|length == 0 %}
                                 <div class="alert alert-warning">
                                     <h5>No Equity Curve Data Available</h5>
                                     <p>The equity curve data could not be found or loaded. This might be because:</p>
@@ -330,13 +361,14 @@
                 const equityDates = {{ equity_curve.dates|tojson }};
                 const equityValues = {{ equity_curve.equity|tojson }};
                 
+                // Create a simple equity curve chart
                 new Chart(ctxElement, {
                     type: 'line',
                     data: {
                         labels: equityDates,
                         datasets: [
                             {
-                                label: 'Equity',
+                                label: 'Equity Curve',
                                 data: equityValues,
                                 borderColor: 'rgb(75, 192, 192)',
                                 backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -348,15 +380,54 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
                         scales: {
                             y: {
-                                beginAtZero: false
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'Account Value'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Date'
+                                }
                             }
                         },
                         plugins: {
                             title: {
                                 display: true,
-                                text: 'Equity Curve'
+                                text: 'Equity Curve',
+                                font: {
+                                    size: 16
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('en-US', {
+                                                style: 'currency',
+                                                currency: 'USD',
+                                                minimumFractionDigits: 2
+                                            }).format(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            },
+                            legend: {
+                                display: true,
+                                position: 'top'
                             }
                         }
                     }

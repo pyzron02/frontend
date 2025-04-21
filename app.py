@@ -48,12 +48,25 @@ DEFAULT_NUM_SIMULATIONS = int(os.getenv('DEFAULT_NUM_SIMULATIONS', '100'))
 app.template_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 
 def get_workflow_type_from_folder(folder_name):
-    """Extract workflow type from folder name"""
+    """Extract workflow type from a folder name
+    
+    Folder names typically follow pattern: StrategyName_workflow-type_timestamp_hash
+    For example: MultiPosition_complete_20250421_204646_6a8f39e2
+    
+    Returns:
+        str: Workflow type (simple, optimization, monte_carlo, complete)
+             or None if not detected
+    """
+    # Common workflow types
     workflow_types = ["simple", "optimization", "monte_carlo", "complete"]
-    for wt in workflow_types:
-        if wt in folder_name:
-            return wt
-    return "unknown"
+    
+    # Check if any of the known workflow types are in the folder name
+    for workflow in workflow_types:
+        if f"_{workflow}_" in folder_name:
+            return workflow
+    
+    # If no match, try to infer from directory structure
+    return None
 
 def get_output_folders():
     """Get all output folders from the backtester"""
@@ -119,120 +132,244 @@ def read_summary_files(folder_path):
             summary_path = os.path.join(folder_path, file)
             try:
                 with open(summary_path, 'r') as f:
+                    content = f.read()
+                    
+                # Process Monte Carlo summary files to enhance display
+                if 'monte_carlo_summary' in file.lower():
+                    # Extract key sections for better formatting on the frontend
+                    sections = {}
+                    current_section = "header"
+                    sections[current_section] = []
+                    
+                    # Parse the summary into sections
+                    for line in content.splitlines():
+                        if line.startswith('=====') and current_section == "header":
+                            current_section = "strategy_info"
+                            continue
+                        elif line.startswith('=====') and "SIMULATION PARAMETERS" in line:
+                            current_section = "simulation_parameters"
+                            continue
+                        elif line.startswith('-----') and "Portfolio Statistics" in line:
+                            current_section = "portfolio_statistics"
+                            continue
+                        elif line.startswith('-----') and "Simulation Results" in line:
+                            current_section = "simulation_results"
+                            continue
+                        elif line.startswith('-----') and "Confidence Intervals" in line:
+                            current_section = "confidence_intervals"
+                            continue
+                        elif line.startswith('-----') and "Risk Metrics" in line:
+                            current_section = "risk_metrics"
+                            continue
+                        elif line.startswith('-----') and "Probability Metrics" in line:
+                            current_section = "probability_metrics"
+                            continue
+                        elif line.startswith('=====') and "WORKFLOW STATUS" in line:
+                            current_section = "workflow_status"
+                            continue
+                        
+                        # Store line in current section
+                        if current_section not in sections:
+                            sections[current_section] = []
+                        sections[current_section].append(line)
+                    
+                    # Add the formatted summary with additional metadata
                     summaries.append({
                         'name': file,
-                        'content': f.read(),
-                        'path': summary_path
+                        'content': content,
+                        'path': summary_path,
+                        'type': 'monte_carlo',
+                        'sections': sections
+                    })
+                else:
+                    # Regular summary file
+                    summaries.append({
+                        'name': file,
+                        'content': content,
+                        'path': summary_path,
+                        'type': 'standard'
                     })
             except Exception as e:
                 summaries.append({
                     'name': file,
                     'content': f"Error reading summary file: {str(e)}",
-                    'path': summary_path
+                    'path': summary_path,
+                    'type': 'error'
                 })
     return summaries
 
-def get_equity_curve(folder_path):
-    """Get equity curve CSV if available"""
-    print(f"Looking for equity curve in {folder_path}")
+def get_equity_curve(output_path):
+    """
+    Get equity curve data from output folder, prioritizing by workflow type.
     
-    # First look in main directory
-    for file in os.listdir(folder_path):
-        if file == 'equity_curve.csv':
+    Different workflows store equity curves in different locations:
+    - simple: Looks for equity_curve.csv in main folder
+    - optimization: Checks 02_optimization or for best parameters 
+    - monte_carlo: Searches in 03_monte_carlo/backtest
+    - complete: Looks in 04_optimized_backtest for final result
+    
+    Args:
+        output_path: Path to the output folder
+        
+    Returns:
+        dict: Dictionary containing dates, equity values, moving averages and DataFrame,
+              or None if not found
+    """
+    # Get the workflow type from the folder name
+    folder_name = os.path.basename(output_path)
+    workflow_type = get_workflow_type_from_folder(folder_name)
+    
+    # Define priority folders based on workflow type
+    priority_folders = {
+        "simple": [""],  # Just the main folder
+        "optimization": ["02_optimization", ""],
+        "monte_carlo": ["03_monte_carlo/backtest", "03_monte_carlo", ""],
+        "complete": ["04_optimized_backtest", "01_backtest", ""],
+        None: [""]  # Default to main folder if workflow type not detected
+    }
+    
+    # Try the priority folders first
+    folders_to_check = priority_folders.get(workflow_type, [""])
+    
+    print(f"Detected workflow type: {workflow_type} for {output_path}")
+    print(f"Checking priority folders: {folders_to_check}")
+    
+    # First check priority folders based on workflow type
+    for folder in folders_to_check:
+        equity_curve_path = os.path.join(output_path, folder, "equity_curve.csv")
+        print(f"Checking for equity curve at: {equity_curve_path}")
+        if os.path.exists(equity_curve_path):
             try:
-                curve_path = os.path.join(folder_path, file)
-                if os.path.exists(curve_path) and os.path.isfile(curve_path):
-                    print(f"Found equity curve at {curve_path}")
-                    df = pd.read_csv(curve_path)
-                    
-                    # Ensure dates are properly formatted
-                    if 'date' in df.columns:
-                        # Make dates JSON serializable
-                        df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
-                    
-                    dates = df['date'].tolist() if 'date' in df.columns else []
-                    equity = df['equity'].tolist() if 'equity' in df.columns else []
-                    
-                    print(f"Equity curve has {len(dates)} dates and {len(equity)} equity values")
-                    
-                    return {
-                        'path': curve_path,
-                        'data': df.to_dict(orient='records'),
-                        'dates': dates,
-                        'equity': equity
-                    }
-            except Exception as e:
-                print(f"Error loading equity curve: {str(e)}")
-                pass
-    
-    # Look for specific workflow directories first
-    backtest_dirs = ['01_backtest', 'backtest', 'simple']
-    for backtest_dir in backtest_dirs:
-        possible_dir = os.path.join(folder_path, backtest_dir)
-        if os.path.exists(possible_dir) and os.path.isdir(possible_dir):
-            print(f"Checking specific backtest directory: {possible_dir}")
-            for file in os.listdir(possible_dir):
-                if file == 'equity_curve.csv':
-                    try:
-                        curve_path = os.path.join(possible_dir, file)
-                        if os.path.exists(curve_path) and os.path.isfile(curve_path):
-                            print(f"Found equity curve at {curve_path}")
-                            df = pd.read_csv(curve_path)
-                            
-                            # Ensure dates are properly formatted
-                            if 'date' in df.columns:
-                                # Make dates JSON serializable
-                                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
-                            
-                            dates = df['date'].tolist() if 'date' in df.columns else []
-                            equity = df['equity'].tolist() if 'equity' in df.columns else []
-                            
-                            print(f"Equity curve has {len(dates)} dates and {len(equity)} equity values")
-                            
-                            return {
-                                'path': curve_path,
-                                'data': df.to_dict(orient='records'),
-                                'dates': dates,
-                                'equity': equity
-                            }
-                    except Exception as e:
-                        print(f"Error loading equity curve from specific directory: {str(e)}")
-                        pass
+                print(f"Found equity curve at: {equity_curve_path}")
+                df = pd.read_csv(equity_curve_path)
                 
-    # Check all subdirectories as fallback
-    for subdir in os.listdir(folder_path):
-        subdir_path = os.path.join(folder_path, subdir)
-        if os.path.isdir(subdir_path):
-            print(f"Checking subdirectory {subdir_path} for equity curve")
-            for file in os.listdir(subdir_path):
-                if file == 'equity_curve.csv':
-                    try:
-                        curve_path = os.path.join(subdir_path, file)
-                        if os.path.exists(curve_path) and os.path.isfile(curve_path):
-                            print(f"Found equity curve at {curve_path}")
-                            df = pd.read_csv(curve_path)
-                            
-                            # Ensure dates are properly formatted
-                            if 'date' in df.columns:
-                                # Make dates JSON serializable
-                                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
-                            
-                            dates = df['date'].tolist() if 'date' in df.columns else []
-                            equity = df['equity'].tolist() if 'equity' in df.columns else []
-                            
-                            print(f"Equity curve has {len(dates)} dates and {len(equity)} equity values")
-                            
-                            return {
-                                'path': curve_path,
-                                'data': df.to_dict(orient='records'),
-                                'dates': dates,
-                                'equity': equity
-                            }
-                    except Exception as e:
-                        print(f"Error loading equity curve from subdirectory: {str(e)}")
-                        pass
+                # Process data for chart display
+                # Convert Date column if it exists
+                if 'Date' in df.columns:
+                    df['Date'] = pd.to_datetime(df['Date'])
+                    # Format dates for display
+                    dates = df['Date'].dt.strftime('%Y-%m-%d').tolist()
+                else:
+                    # Use index as dates if no Date column
+                    dates = [str(i) for i in range(len(df))]
+                
+                # Get equity values
+                if 'Value' in df.columns:
+                    equity = df['Value'].tolist()
+                elif 'Equity' in df.columns:
+                    equity = df['Equity'].tolist()
+                else:
+                    # Try to find any column that might contain equity values
+                    numeric_cols = df.select_dtypes(include=['number']).columns
+                    if len(numeric_cols) > 0:
+                        equity = df[numeric_cols[0]].tolist()
+                    else:
+                        print(f"No suitable numeric column found in {equity_curve_path}")
+                        continue  # Try next folder
+                
+                # Calculate moving averages
+                ma_periods = [20, 50, 200]  # Short, medium, long-term MAs
+                ma_data = {}
+                
+                for period in ma_periods:
+                    if len(equity) > period:
+                        try:
+                            # Calculate simple moving average and properly handle NaNs at the beginning
+                            # Use forward fill (ffill) method instead of None
+                            series = pd.Series(equity)
+                            ma_series = series.rolling(window=period).mean()
+                            # Replace NaN values with the first valid value (forward fill)
+                            ma_values = ma_series.fillna(method='ffill').tolist()
+                            # If there are still NaNs at the beginning, replace with the first valid value
+                            if pd.isna(ma_values[0]) and any(not pd.isna(x) for x in ma_values):
+                                first_valid = next(x for x in ma_values if not pd.isna(x))
+                                ma_values = [first_valid if pd.isna(x) else x for x in ma_values]
+                            ma_data[f'MA{period}'] = ma_values
+                        except Exception as e:
+                            print(f"Error calculating {period}-day MA: {e}")
+                            # Skip this MA period but continue with others
+                
+                return {
+                    'dates': dates,
+                    'equity': equity,
+                    'moving_averages': ma_data,
+                    'df': df  # Return the original dataframe for potential further analysis
+                }
+            except Exception as e:
+                print(f"Error loading equity curve from {equity_curve_path}: {e}")
+                # Continue to next folder rather than returning None
     
-    print("No equity curve found")
+    # If still not found, do a recursive search
+    print("Priority folders search failed, doing recursive search...")
+    for root, dirs, files in os.walk(output_path):
+        if "equity_curve.csv" in files:
+            equity_curve_path = os.path.join(root, "equity_curve.csv")
+            try:
+                print(f"Found equity curve during recursive search at: {equity_curve_path}")
+                df = pd.read_csv(equity_curve_path)
+                
+                # Check if file is empty or malformed
+                if df.empty:
+                    print(f"Empty equity curve file found at {equity_curve_path}")
+                    continue
+                
+                # Process data for chart display
+                # Convert Date column if it exists
+                if 'Date' in df.columns:
+                    df['Date'] = pd.to_datetime(df['Date'])
+                    # Format dates for display
+                    dates = df['Date'].dt.strftime('%Y-%m-%d').tolist()
+                else:
+                    # Use index as dates if no Date column
+                    dates = [str(i) for i in range(len(df))]
+                
+                # Get equity values
+                if 'Value' in df.columns:
+                    equity = df['Value'].tolist()
+                elif 'Equity' in df.columns:
+                    equity = df['Equity'].tolist()
+                else:
+                    # Try to find any column that might contain equity values
+                    numeric_cols = df.select_dtypes(include=['number']).columns
+                    if len(numeric_cols) > 0:
+                        equity = df[numeric_cols[0]].tolist()
+                    else:
+                        print(f"No suitable numeric column found in {equity_curve_path}")
+                        continue  # Try next file
+                
+                # Calculate moving averages
+                ma_periods = [20, 50, 200]  # Short, medium, long-term MAs
+                ma_data = {}
+                
+                for period in ma_periods:
+                    if len(equity) > period:
+                        try:
+                            # Calculate simple moving average and properly handle NaNs at the beginning
+                            # Use forward fill (ffill) method instead of None
+                            series = pd.Series(equity)
+                            ma_series = series.rolling(window=period).mean()
+                            # Replace NaN values with the first valid value (forward fill)
+                            ma_values = ma_series.fillna(method='ffill').tolist()
+                            # If there are still NaNs at the beginning, replace with the first valid value
+                            if pd.isna(ma_values[0]) and any(not pd.isna(x) for x in ma_values):
+                                first_valid = next(x for x in ma_values if not pd.isna(x))
+                                ma_values = [first_valid if pd.isna(x) else x for x in ma_values]
+                            ma_data[f'MA{period}'] = ma_values
+                        except Exception as e:
+                            print(f"Error calculating {period}-day MA: {e}")
+                            # Skip this MA period but continue with others
+                
+                return {
+                    'dates': dates,
+                    'equity': equity,
+                    'moving_averages': ma_data,
+                    'df': df  # Return the original dataframe for potential further analysis
+                }
+            except Exception as e:
+                print(f"Error loading equity curve from {equity_curve_path}: {e}")
+                # Continue search
+    
+    print(f"No equity curve found for {output_path}")
     return None
 
 def get_trade_log(folder_path):
@@ -393,15 +530,16 @@ def get_monte_carlo_charts(folder_path):
 
 def get_equity_curve_description(workflow_type):
     """Get description of equity curve based on workflow type"""
+    base_description = ""
     if workflow_type == "simple":
-        return """
+        base_description = """
         <h5>Simple Workflow Equity Curve</h5>
         <p>This equity curve represents the actual balance of your trading account over time. 
         Each point corresponds to a day/timestamp in the backtest period, showing how your capital 
         would have grown or declined based on the trading strategy with fixed parameters.</p>
         """
     elif workflow_type == "optimization":
-        return """
+        base_description = """
         <h5>Optimization Workflow Equity Curve</h5>
         <p>This equity curve shows the performance of your strategy with the <strong>best parameters</strong> 
         found during optimization. After testing many parameter combinations, the optimizer selected 
@@ -409,7 +547,7 @@ def get_equity_curve_description(workflow_type):
         demonstrates how those optimal parameters would have performed historically.</p>
         """
     elif workflow_type == "monte_carlo":
-        return """
+        base_description = """
         <h5>Monte Carlo Workflow Equity Curve</h5>
         <p>This equity curve represents the <strong>average or median</strong> equity path across 
         multiple simulations. In Monte Carlo analysis, the price data is randomized/permuted to test 
@@ -417,7 +555,7 @@ def get_equity_curve_description(workflow_type):
         for market randomness. Check the Monte Carlo tab for the distribution of possible outcomes.</p>
         """
     elif workflow_type == "complete":
-        return """
+        base_description = """
         <h5>Complete Workflow Equity Curve</h5>
         <p>This equity curve combines the benefits of both optimization and Monte Carlo testing. 
         It shows the performance of optimized parameters that have also been validated through 
@@ -425,11 +563,13 @@ def get_equity_curve_description(workflow_type):
         perform in real market conditions.</p>
         """
     else:
-        return """
+        base_description = """
         <h5>Equity Curve</h5>
         <p>This chart shows the growth of your trading account over the backtest period based on 
         the strategy's trades. It's a visual representation of cumulative performance over time.</p>
         """
+        
+    return base_description
 
 @app.route('/')
 def index():
@@ -513,10 +653,78 @@ def view_result(folder_name):
         workflow_type = get_workflow_type_from_folder(folder_name)
         strategy_name = folder_name.split('_')[0]
         
+        print(f"Processing result view for {folder_name}, workflow: {workflow_type}")
+        
         # Get various result components
         logs = read_log_file(folder_path)
         summaries = read_summary_files(folder_path)
+        
+        # Get equity curve data with additional logging
+        print(f"Attempting to retrieve equity curve data for {folder_name}")
         equity_curve = get_equity_curve(folder_path)
+        
+        # Special handling for optimization results if no equity curve found
+        if not equity_curve and workflow_type == 'optimization':
+            print("Attempting to find main equity curve file directly for optimization workflow")
+            try:
+                # For optimization workflows, try to find the equity curve in the root folder first
+                main_equity_path = os.path.join(folder_path, 'equity_curve.csv')
+                if os.path.exists(main_equity_path):
+                    print(f"Found main equity curve at: {main_equity_path}")
+                    df = pd.read_csv(main_equity_path)
+                    if not df.empty:
+                        # Convert dates
+                        if 'Date' in df.columns:
+                            df['Date'] = pd.to_datetime(df['Date'])
+                            dates = df['Date'].dt.strftime('%Y-%m-%d').tolist()
+                        else:
+                            dates = [str(i) for i in range(len(df))]
+                        
+                        # Get equity values
+                        if 'Value' in df.columns:
+                            equity = df['Value'].tolist()
+                        elif 'Equity' in df.columns:
+                            equity = df['Equity'].tolist()
+                        else:
+                            numeric_cols = df.select_dtypes(include=['number']).columns
+                            if len(numeric_cols) > 0:
+                                equity = df[numeric_cols[0]].tolist()
+                            else:
+                                raise ValueError("No suitable numeric column found")
+                        
+                        # Process moving averages
+                        ma_data = {}
+                        for period in [20, 50, 200]:
+                            if len(equity) > period:
+                                try:
+                                    series = pd.Series(equity)
+                                    ma_series = series.rolling(window=period).mean()
+                                    # Use bfill (backward fill) which can work better for the start of the series
+                                    ma_values = ma_series.fillna(method='bfill').tolist()
+                                    ma_data[f'MA{period}'] = ma_values
+                                except Exception as e:
+                                    print(f"Error calculating MA: {e}")
+                        
+                        equity_curve = {
+                            'dates': dates,
+                            'equity': equity,
+                            'moving_averages': ma_data,
+                            'df': df
+                        }
+                        print(f"Successfully created equity curve data manually")
+            except Exception as e:
+                print(f"Failed to manually create equity curve: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        if equity_curve:
+            print(f"Successfully found equity curve data with {len(equity_curve['dates'])} data points")
+        else:
+            print(f"No equity curve data found for {folder_name}")
+        
+        # Find equity curve plots generated by workflows with --plot flag
+        equity_plots = get_equity_curve_plots(folder_path) if 'get_equity_curve_plots' in globals() else []
+        
         trade_log = get_trade_log(folder_path)
         optimization_results = get_optimization_results(folder_path)
         monte_carlo_charts = get_monte_carlo_charts(folder_path)
@@ -533,6 +741,7 @@ def view_result(folder_name):
             logs=logs,
             summaries=summaries,
             equity_curve=equity_curve,
+            equity_plots=equity_plots if 'equity_plots' in locals() else [],
             trade_log=trade_log,
             optimization_results=optimization_results,
             monte_carlo_charts=monte_carlo_charts,
@@ -541,6 +750,8 @@ def view_result(folder_name):
         )
     except Exception as e:
         print(f"Error viewing result {folder_name}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         flash(f"Error viewing result: {str(e)}")
         return redirect(url_for('results'))
 
@@ -655,7 +866,7 @@ def run_backtest():
                             typed_values.append(float(v))
                         except ValueError:
                             typed_values.append(v)
-                
+                        
                 if typed_values:
                     parameter_grid[param_name] = typed_values
             except Exception as e:
@@ -839,8 +1050,8 @@ def cleanup_configs():
                 deleted_count += 1
             except Exception:
                 error_count += 1
-    
-    return jsonify({
+        
+        return jsonify({
         'status': 'success',
         'message': f'Deleted {deleted_count} old config files, {error_count} errors',
         'remaining_files': len(config_files) - deleted_count
@@ -849,6 +1060,22 @@ def cleanup_configs():
 if __name__ == '__main__':
     # Create temp directory for temporary files
     os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp'), exist_ok=True)
+    
+    # Verify output directory exists
+    output_dir = os.path.join(project_root, 'output')
+    if not os.path.exists(output_dir):
+        print(f"WARNING: Output directory not found at {output_dir}")
+        print("Creating output directory...")
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            print(f"Created output directory at {output_dir}")
+        except Exception as e:
+            print(f"Error creating output directory: {str(e)}")
+    else:
+        print(f"Output directory found at {output_dir}")
+        # List all result folders
+        folders = [f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f)) and not f.startswith('.')]
+        print(f"Found {len(folders)} result folders in output directory")
     
     # Clean up old config files on startup
     def cleanup_old_configs():
