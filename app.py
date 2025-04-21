@@ -665,9 +665,25 @@ def run_backtest():
     
     # Add specific parameters for different workflow types
     if workflow_type in ['optimization', 'complete']:
+        # Get the optimization metric from the form
+        optimization_metric = request.form.get('optimization_metric', 'sharpe_ratio')
+        
+        # Map the metric name from UI to the format expected by the backtester
+        metric_mapping = {
+            'sharpe_ratio': 'sharpe_ratio',
+            'sortino_ratio': 'sortino_ratio',
+            'calmar_ratio': 'calmar_ratio',
+            'total_return': 'total_return'  # Ensure this maps correctly
+        }
+        
+        # Use the mapped metric or default to sharpe_ratio if unknown
+        mapped_metric = metric_mapping.get(optimization_metric, 'sharpe_ratio')
+        
+        print(f"Using optimization metric: {mapped_metric} (from UI: {optimization_metric})")
+        
         config["strategies"][strategy]["optimization"] = {
             "n_trials": int(request.form.get('n_trials', 50)),
-            "optimization_metric": request.form.get('optimization_metric', 'sharpe_ratio')
+            "optimization_metric": mapped_metric
         }
     
     if workflow_type in ['monte_carlo', 'complete']:
