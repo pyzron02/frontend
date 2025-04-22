@@ -331,7 +331,7 @@
                 <!-- First find and display the dashboard image if available -->
                 {% set dashboard_found = false %}
                 {% for chart in monte_carlo_charts %}
-                    {% if 'dashboard' in chart.name.lower() or 'monte_carlo_dashboard' in chart.path.lower() %}
+                    {% if 'monte_carlo_dashboard' in chart.name %}
                         {% set dashboard_found = true %}
                         <div class="row mb-4">
                             <div class="col-md-12">
@@ -368,11 +368,21 @@
                         <h5 class="mb-0">Monte Carlo Visualizations</h5>
                     </div>
                     <div class="card-body">
+                        <!-- Debug info -->
+                        <div class="alert alert-info mb-3">
+                            <p><strong>Debug:</strong> Found {{ monte_carlo_charts|length }} charts total.</p>
+                            <ul class="mb-0">
+                                {% for chart in monte_carlo_charts %}
+                                <li>{{ chart.name }} ({{ chart.type }})</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+
                         <!-- Tab navigation with unique ID -->
                         <ul class="nav nav-tabs mb-3" id="mcVisualizationTabs" role="tablist">
                             {% set first_tab = true %}
                             {% for chart in monte_carlo_charts %}
-                                {% if not ('dashboard' in chart.name.lower() or 'monte_carlo_dashboard' in chart.path.lower()) %}
+                                {% if not 'monte_carlo_dashboard' in chart.name %}
                                     {% set chart_id = chart.name|replace('.png', '')|replace('.html', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower|replace('.', '_') %}
                                     <li class="nav-item" role="presentation">
                                         <button class="nav-link {% if first_tab %}active{% endif %}" 
@@ -397,7 +407,7 @@
                         <div class="tab-content" id="mcVisualizationsContent">
                             {% set first_tab = true %}
                             {% for chart in monte_carlo_charts %}
-                                {% if not ('dashboard' in chart.name.lower() or 'monte_carlo_dashboard' in chart.path.lower()) %}
+                                {% if not 'monte_carlo_dashboard' in chart.name %}
                                     {% set chart_id = chart.name|replace('.png', '')|replace('.html', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower|replace('.', '_') %}
                                     <div class="tab-pane fade {% if first_tab %}show active{% endif %}" 
                                          id="mc-{{ chart_id }}-content" 
@@ -427,6 +437,20 @@
                                 {% endif %}
                             {% endfor %}
                         </div>
+
+                        <!-- If no tabs created (all charts are dashboards), show a message -->
+                        {% set any_vis = false %}
+                        {% for chart in monte_carlo_charts %}
+                            {% if not 'monte_carlo_dashboard' in chart.name %}
+                                {% set any_vis = true %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if not any_vis %}
+                        <div class="alert alert-info mt-3">
+                            <p>No individual Monte Carlo visualizations found. Only the dashboard is available.</p>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
                 
@@ -434,13 +458,12 @@
                 {% if not dashboard_found %}
                 <div class="alert alert-info mb-4">
                     <h5>No Dashboard Visualization Found</h5>
-                    <p>The Monte Carlo dashboard visualization was not found. This might be because:</p>
+                    <p>No Monte Carlo dashboard visualization was found in this result directory. This might be because:</p>
                     <ul>
                         <li>The Monte Carlo simulation was run without the enhanced_plots option</li>
                         <li>The dashboard file is named differently than expected</li>
                         <li>The dashboard file is in an unexpected location</li>
                     </ul>
-                    <p>You can still view individual visualizations in the tabs below.</p>
                 </div>
                 {% endif %}
             </div>
