@@ -369,14 +369,6 @@
                     </div>
                     <div class="card-body">
                         <!-- Debug info -->
-                        <div class="alert alert-info mb-3">
-                            <p><strong>Debug:</strong> Found {{ monte_carlo_charts|length }} charts total.</p>
-                            <ul class="mb-0">
-                                {% for chart in monte_carlo_charts %}
-                                <li>{{ chart.name }} ({{ chart.type }})</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
 
                         <!-- Tab navigation with unique ID -->
                         <ul class="nav nav-tabs mb-3" id="mcVisualizationTabs" role="tablist">
