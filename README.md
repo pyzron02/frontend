@@ -124,6 +124,8 @@ python -m pytest test_strategy.py
 
 ## Deployment
 
+### Standard Deployment
+
 For production deployment:
 
 1. Set `FLASK_ENV=production` in your `.env` file
@@ -134,6 +136,56 @@ For production deployment:
    ```
 
 3. Consider using a reverse proxy like Nginx to handle static files and SSL
+
+### Docker Deployment
+
+This application supports Docker for easy deployment and integration with the trading-strategy-backtester.
+
+#### Building the Docker Image
+
+```bash
+# Build the frontend Docker image
+./build_docker.sh
+```
+
+#### Running with Docker Compose
+
+The easiest way to run the application is with Docker Compose:
+
+```bash
+# Run the application with Docker Compose
+./run_docker.sh
+```
+
+This will:
+1. Check for the trading-strategy-backtester directory
+2. Start the frontend container linked to the backtester
+3. Make the application available at http://localhost:5000
+
+#### Manual Docker Setup
+
+You can also manually run the Docker container:
+
+```bash
+# Build the image
+docker build -t trading-backtester-frontend:latest .
+
+# Run the container
+docker run -p 5000:5000 \
+  -v /home/pyzron02/trading-strategy-backtester:/trading-strategy-backtester \
+  -e BACKTESTER_ROOT=/trading-strategy-backtester \
+  trading-backtester-frontend:latest
+```
+
+#### Environment Variables
+
+When using Docker, you can configure the application using environment variables:
+
+- `BACKTESTER_ROOT`: Path to the trading-strategy-backtester directory (inside the container)
+- `SECRET_KEY`: Secret key for Flask session security
+- `DEFAULT_START_DATE`: Default start date for backtests
+- `DEFAULT_END_DATE`: Default end date for backtests
+- `DEFAULT_NUM_SIMULATIONS`: Default number of Monte Carlo simulations
 
 ## License
 

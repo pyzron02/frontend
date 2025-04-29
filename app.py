@@ -23,7 +23,14 @@ except ImportError:
     load_dotenv()
 
 # Add the trading-strategy-backtester to the path
+# Support both Docker and local development paths
 project_root = os.getenv('BACKTESTER_ROOT', '/home/pyzron02/trading-strategy-backtester')
+
+# In Docker environment, the backtester will be mounted at /trading-strategy-backtester
+if os.path.exists('/trading-strategy-backtester') and not os.path.exists(project_root):
+    project_root = '/trading-strategy-backtester'
+    print(f"Using Docker project root: {project_root}")
+
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, 'src'))
 
