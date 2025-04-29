@@ -5,14 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Backtest Results</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
     <style>
         body {
             padding-top: 2rem;
             padding-bottom: 2rem;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         .card {
             margin-bottom: 20px;
-            transition: transform 0.2s;
+            transition: transform 0.2s, background-color 0.3s ease, border-color 0.3s ease;
         }
         .card:hover {
             transform: translateY(-5px);
@@ -27,6 +29,108 @@
             top: 20px;
             right: 20px;
             z-index: 9999;
+        }
+        
+        /* Dark mode toggle button */
+        .mode-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--bs-primary);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        
+        .mode-toggle:hover {
+            transform: scale(1.1);
+        }
+        
+        .mode-toggle:active {
+            transform: scale(0.95);
+        }
+        
+        /* Dark mode styles */
+        body.dark-mode {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        
+        .dark-mode .card {
+            background-color: #1e1e1e;
+            border-color: #2d2d2d;
+        }
+        
+        .dark-mode .card-header {
+            background-color: #2d2d2d;
+            border-color: #3d3d3d;
+        }
+        
+        .dark-mode .text-muted {
+            color: #9e9e9e !important;
+        }
+        
+        .dark-mode .form-control, 
+        .dark-mode .form-select {
+            background-color: #2d2d2d;
+            border-color: #3d3d3d;
+            color: #e0e0e0;
+        }
+        
+        .dark-mode .form-control:focus, 
+        .dark-mode .form-select:focus {
+            background-color: #2d2d2d;
+            border-color: #4d4d4d;
+            color: #e0e0e0;
+        }
+        
+        .dark-mode .border-bottom {
+            border-color: #2d2d2d !important;
+        }
+        
+        .dark-mode .btn-outline-primary {
+            border-color: #3d5a80;
+            color: #3d5a80;
+        }
+        
+        .dark-mode .btn-outline-primary:hover {
+            background-color: #3d5a80;
+            color: white;
+        }
+        
+        .dark-mode .btn-primary {
+            background-color: #3d5a80;
+            border-color: #3d5a80;
+        }
+        
+        .dark-mode .btn-primary:hover {
+            background-color: #2d4a70;
+            border-color: #2d4a70;
+        }
+        
+        .dark-mode .btn-outline-secondary {
+            border-color: #5d5d5d;
+            color: #b0b0b0;
+        }
+        
+        .dark-mode .btn-outline-secondary:hover {
+            background-color: #3d3d3d;
+            color: white;
+        }
+        
+        .dark-mode code {
+            background-color: #2d2d2d;
+            color: #e0e0e0;
         }
     </style>
 </head>
@@ -81,6 +185,7 @@
                                         <option value="simple">Simple Backtest</option>
                                         <option value="optimization">Optimization</option>
                                         <option value="monte_carlo">Monte Carlo</option>
+                                        <option value="walk_forward">Walk Forward</option>
                                         <option value="complete">Complete Workflow</option>
                                     </select>
                                 </div>
@@ -107,7 +212,7 @@
                                 <div>
                                     <h5 class="mb-0">
                                         {{ folder.strategy }}
-                                        <span class="badge bg-{{ 'primary' if folder.workflow == 'simple' else 'success' if folder.workflow == 'optimization' else 'info' if folder.workflow == 'monte_carlo' else 'warning' }} workflow-badge">
+                                        <span class="badge bg-{{ 'primary' if folder.workflow == 'simple' else 'success' if folder.workflow == 'optimization' else 'info' if folder.workflow == 'monte_carlo' else 'danger' if folder.workflow == 'walk_forward' else 'warning' }} workflow-badge">
                                             {{ folder.workflow|capitalize }}
                                         </span>
                                     </h5>
@@ -134,6 +239,12 @@
             </div>
         {% endif %}
     </div>
+    
+    <!-- Dark Mode Toggle Button -->
+    <button id="mode-toggle" class="mode-toggle" title="Toggle dark/light mode">
+        <i class="bi bi-moon-stars-fill" id="dark-mode-icon"></i>
+        <i class="bi bi-sun-fill" id="light-mode-icon" style="display: none;"></i>
+    </button>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -195,6 +306,45 @@
                         item.style.display = '';
                     });
                 });
+            }
+            
+            // Dark mode functionality
+            const darkModeToggle = document.getElementById('mode-toggle');
+            const darkModeIcon = document.getElementById('dark-mode-icon');
+            const lightModeIcon = document.getElementById('light-mode-icon');
+            
+            // Check for saved theme preference or use preferred color scheme
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            // Apply theme based on saved preference or system preference
+            if (savedTheme === 'dark' || (!savedTheme && prefersDarkMode)) {
+                enableDarkMode();
+            } else {
+                enableLightMode();
+            }
+            
+            // Toggle between dark and light mode
+            darkModeToggle.addEventListener('click', function() {
+                if (document.body.classList.contains('dark-mode')) {
+                    enableLightMode();
+                } else {
+                    enableDarkMode();
+                }
+            });
+            
+            function enableDarkMode() {
+                document.body.classList.add('dark-mode');
+                darkModeIcon.style.display = 'none';
+                lightModeIcon.style.display = 'block';
+                localStorage.setItem('theme', 'dark');
+            }
+            
+            function enableLightMode() {
+                document.body.classList.remove('dark-mode');
+                darkModeIcon.style.display = 'block';
+                lightModeIcon.style.display = 'none';
+                localStorage.setItem('theme', 'light');
             }
         });
     </script>

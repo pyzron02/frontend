@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ strategy_name }} - {{ workflow_type|capitalize }} Results</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
     <style>
         body {
             padding-top: 2rem;
             padding-bottom: 2rem;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         .chart-container {
             height: 400px;
@@ -61,6 +63,161 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             margin-bottom: 20px;
+        }
+        .dashboard-frame, .visualization-frame {
+            width: 100%;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .visualization-item {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+            padding: 20px;
+        }
+        .visualization-item h5 {
+            color: #495057;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+        #mcVisualizationTabs .nav-link {
+            margin-right: 5px;
+            border-radius: 0.25rem;
+            border: 1px solid #dee2e6;
+            background-color: #f8f9fa;
+            color: #495057;
+        }
+        #mcVisualizationTabs .nav-link.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .tab-pane {
+            padding: 15px 0;
+        }
+        
+        /* Dark mode toggle button */
+        .mode-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--bs-primary);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        
+        .mode-toggle:hover {
+            transform: scale(1.1);
+        }
+        
+        .mode-toggle:active {
+            transform: scale(0.95);
+        }
+        
+        /* Dark mode styles */
+        body.dark-mode {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        
+        .dark-mode .card,
+        .dark-mode .visualization-item {
+            background-color: #1e1e1e;
+            border-color: #2d2d2d;
+        }
+        
+        .dark-mode .card-header,
+        .dark-mode .summary-header {
+            background-color: #2d2d2d;
+            border-color: #3d3d3d;
+        }
+        
+        .dark-mode .nav-tabs {
+            border-color: #2d2d2d;
+        }
+        
+        .dark-mode .nav-tabs .nav-link {
+            color: #e0e0e0;
+        }
+        
+        .dark-mode .nav-tabs .nav-link.active {
+            background-color: #2d2d2d;
+            border-color: #3d3d3d #3d3d3d #2d2d2d;
+            color: #007bff;
+        }
+        
+        .dark-mode pre, 
+        .dark-mode code {
+            background-color: #2d2d2d;
+            color: #f9c74f;
+        }
+        
+        .dark-mode .text-muted {
+            color: #9e9e9e !important;
+        }
+        
+        .dark-mode .metric-name {
+            color: #9e9e9e;
+        }
+        
+        .dark-mode .border-bottom {
+            border-color: #2d2d2d !important;
+        }
+        
+        .dark-mode .btn-outline-primary,
+        .dark-mode .btn-outline-secondary {
+            border-color: #3d5a80;
+            color: #7cc7d8;
+        }
+        
+        .dark-mode .btn-outline-primary:hover,
+        .dark-mode .btn-outline-secondary:hover {
+            background-color: #3d5a80;
+            color: white;
+        }
+        
+        .dark-mode .visualization-item {
+            background-color: #1e1e1e;
+            border-color: #2d2d2d;
+        }
+        
+        .dark-mode .visualization-item h5 {
+            color: #e0e0e0;
+            border-color: #3d3d3d;
+        }
+        
+        .dark-mode .alert-info {
+            background-color: #324b5c;
+            color: #cfdbd9;
+            border-color: #1f384d;
+        }
+        
+        .dark-mode table {
+            color: #e0e0e0;
+        }
+        
+        .dark-mode .table-striped>tbody>tr:nth-of-type(odd)>* {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .dark-mode .table-hover>tbody>tr:hover>* {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Chart.js dark mode adjustments */
+        .dark-mode .chart-container canvas {
+            filter: invert(0.85) hue-rotate(180deg);
         }
     </style>
 </head>
@@ -126,7 +283,17 @@
                 <button class="nav-link" id="optimization-tab" data-bs-toggle="tab" data-bs-target="#optimization" type="button" role="tab" aria-controls="optimization" aria-selected="false">Optimization</button>
             </li>
             {% endif %}
-            {% if monte_carlo_charts %}
+            {% if workflow_type != "complete" and workflow_type != "walk_forward" and monte_carlo_charts %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="monte-carlo-tab" data-bs-toggle="tab" data-bs-target="#monte-carlo" type="button" role="tab" aria-controls="monte-carlo" aria-selected="false">Monte Carlo</button>
+            </li>
+            {% endif %}
+            {% if walk_forward_results %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="walk-forward-tab" data-bs-toggle="tab" data-bs-target="#walk-forward" type="button" role="tab" aria-controls="walk-forward" aria-selected="false">Walk Forward</button>
+            </li>
+            {% endif %}
+            {% if workflow_type == "complete" and monte_carlo_charts %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="monte-carlo-tab" data-bs-toggle="tab" data-bs-target="#monte-carlo" type="button" role="tab" aria-controls="monte-carlo" aria-selected="false">Monte Carlo</button>
             </li>
@@ -330,268 +497,631 @@
             <div class="tab-pane fade" id="monte-carlo" role="tabpanel" aria-labelledby="monte-carlo-tab">
                 <!-- First find and display the dashboard image if available -->
                 {% set dashboard_found = false %}
-                {% for chart in monte_carlo_charts %}
-                    {% if 'monte_carlo_dashboard' in chart.name %}
-                        {% set dashboard_found = true %}
-                        <div class="row mb-4">
-                            <div class="col-md-12">
-                                <div class="card">
-                                    <div class="card-header bg-dark text-white">
-                                        <h5 class="mb-0">Monte Carlo Dashboard</h5>
+                {% for chart in monte_carlo_charts if 'monte_carlo_dashboard' in chart.name %}
+                    {% set dashboard_found = true %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header bg-dark text-white">
+                                    <h5 class="mb-0">Monte Carlo Dashboard</h5>
+                                </div>
+                                <div class="card-body text-center">
+                                    {% if chart.type == 'html' %}
+                                    <div class="dashboard-frame">
+                                        <iframe src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                title="Monte Carlo Dashboard"
+                                                class="w-100"
+                                                style="height: 900px; min-height: 900px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
+                                                loading="eager"
+                                                allowfullscreen></iframe>
                                     </div>
-                                    <div class="card-body text-center">
-                                        {% if chart.type == 'html' %}
-                                        <div class="ratio ratio-16x9">
-                                            <iframe src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
-                                                    title="Monte Carlo Dashboard"
-                                                    class="w-100"
-                                                    style="height: 800px; border: 1px solid #ddd; border-radius: 4px;"
-                                                    allowfullscreen></iframe>
-                                        </div>
-                                        {% else %}
-                                        <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
-                                             alt="Monte Carlo Dashboard" 
-                                             class="img-fluid"
-                                             style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
-                                             onerror="this.onerror=null; this.src=''; this.alt='Dashboard image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Dashboard image not found</div>'">
-                                        {% endif %}
-                                    </div>
+                                    {% else %}
+                                    <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                         alt="Monte Carlo Dashboard" 
+                                         class="img-fluid"
+                                         style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
+                                         onerror="this.onerror=null; this.src=''; this.alt='Dashboard image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Dashboard image not found</div>'">
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
-                    {% endif %}
+                    </div>
                 {% endfor %}
                 
-                <!-- Create tabs for other Monte Carlo visualizations with revised implementation -->
+                <!-- Individual Monte Carlo visualizations -->
                 <div class="card">
                     <div class="card-header">
                         <h5 class="mb-0">Monte Carlo Visualizations</h5>
                     </div>
                     <div class="card-body">
-                        <!-- Debug info -->
-
-                        <!-- Tab navigation with unique ID -->
-                        <ul class="nav nav-tabs mb-3" id="mcVisualizationTabs" role="tablist">
-                            {% set first_tab = true %}
+                        <!-- Display all individual HTML charts directly -->
+                        <div class="visualizations-container">
                             {% for chart in monte_carlo_charts %}
-                                {% if not 'monte_carlo_dashboard' in chart.name %}
-                                    {% set chart_id = chart.name|replace('.png', '')|replace('.html', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower|replace('.', '_') %}
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link {% if first_tab %}active{% endif %}" 
-                                                id="mc-{{ chart_id }}-tab" 
-                                                data-bs-toggle="tab" 
-                                                data-bs-target="#mc-{{ chart_id }}-content" 
-                                                type="button" 
-                                                role="tab" 
-                                                aria-controls="mc-{{ chart_id }}-content" 
-                                                aria-selected="{% if first_tab %}true{% else %}false{% endif %}">
-                                            {{ chart.name|replace('.png', '')|replace('.html', '')|replace('.jpg', '')|replace('.jpeg', '')|replace('_', ' ')|title }}
-                                        </button>
-                                    </li>
-                                    {% if first_tab %}
-                                        {% set first_tab = false %}
-                                    {% endif %}
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
-                        
-                        <!-- Tab content with unique ID -->
-                        <div class="tab-content" id="mcVisualizationsContent">
-                            {% set first_tab = true %}
-                            {% for chart in monte_carlo_charts %}
-                                {% if not 'monte_carlo_dashboard' in chart.name %}
-                                    {% set chart_id = chart.name|replace('.png', '')|replace('.html', '')|replace('.jpg', '')|replace('.jpeg', '')|replace(' ', '_')|lower|replace('.', '_') %}
-                                    <div class="tab-pane fade {% if first_tab %}show active{% endif %}" 
-                                         id="mc-{{ chart_id }}-content" 
-                                         role="tabpanel" 
-                                         aria-labelledby="mc-{{ chart_id }}-tab">
+                                {% if 'monte_carlo_dashboard' not in chart.name and 'drawdowns_comparison' not in chart.name and chart.type == 'html' %}
+                                    <div class="visualization-item mb-4">
+                                        <h5 class="mb-3">{{ chart.name|replace('.html', '')|replace('_', ' ')|title }}</h5>
                                         <div class="text-center">
-                                            {% if chart.type == 'html' %}
-                                            <div class="ratio ratio-16x9">
+                                            <div class="visualization-frame">
                                                 <iframe src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
                                                         title="{{ chart.name }}"
                                                         class="w-100"
-                                                        style="border: 1px solid #ddd; border-radius: 4px; height: 600px;"
+                                                        style="height: 700px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
+                                                        loading="eager"
                                                         allowfullscreen></iframe>
                                             </div>
-                                            {% else %}
-                                            <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
-                                                 alt="{{ chart.name }}" 
-                                                 class="img-fluid"
-                                                 style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
-                                                 onerror="this.onerror=null; this.src=''; this.alt='Image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Chart image not found</div>'">
-                                            {% endif %}
                                         </div>
                                     </div>
-                                    {% if first_tab %}
-                                        {% set first_tab = false %}
-                                    {% endif %}
                                 {% endif %}
                             {% endfor %}
                         </div>
-
-                        <!-- If no tabs created (all charts are dashboards), show a message -->
-                        {% set any_vis = false %}
-                        {% for chart in monte_carlo_charts %}
-                            {% if not 'monte_carlo_dashboard' in chart.name %}
-                                {% set any_vis = true %}
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if not any_vis %}
-                        <div class="alert alert-info mt-3">
-                            <p>No individual Monte Carlo visualizations found. Only the dashboard is available.</p>
-                        </div>
-                        {% endif %}
                     </div>
                 </div>
-                
-                <!-- If no dashboard was found, show a message -->
-                {% if not dashboard_found %}
-                <div class="alert alert-info mb-4">
-                    <h5>No Dashboard Visualization Found</h5>
-                    <p>No Monte Carlo dashboard visualization was found in this result directory. This might be because:</p>
-                    <ul>
-                        <li>The Monte Carlo simulation was run without the enhanced_plots option</li>
-                        <li>The dashboard file is named differently than expected</li>
-                        <li>The dashboard file is in an unexpected location</li>
-                    </ul>
+            </div>
+            {% endif %}
+
+            <!-- Walk Forward Tab -->
+            {% if walk_forward_results %}
+            <div class="tab-pane fade" id="walk-forward" role="tabpanel" aria-labelledby="walk-forward-tab">
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Walk Forward Analysis</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info">
+                                    <p>Walk Forward Analysis divides your data into multiple periods, trains the strategy on "in-sample" data, and then tests it on "out-of-sample" data. This helps prevent overfitting and gives a more realistic view of how your strategy will perform on unseen data.</p>
+                                </div>
+                                
+                                <!-- Display overall summary if available -->
+                                {% if walk_forward_results.summary %}
+                                <div class="card mb-4">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0">Walk Forward Summary</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <!-- Display key metrics from summary if available -->
+                                            {% if walk_forward_results.summary.parsed_metrics and walk_forward_results.summary.parsed_metrics|length > 0 %}
+                                            <div class="col-md-4 mb-4">
+                                                <div class="card h-100">
+                                                    <div class="card-header">
+                                                        <h6 class="mb-0">Key Performance Metrics</h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <div class="table-responsive">
+                                                            <table class="table table-striped table-bordered">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>Metric</th>
+                                                                        <th>Value</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {% for key, value in walk_forward_results.summary.parsed_metrics.items() %}
+                                                                    <tr>
+                                                                        <td>{{ key|replace('_', ' ')|title }}</td>
+                                                                        <td>{{ value }}</td>
+                                                                    </tr>
+                                                                    {% endfor %}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            
+                                            <!-- Display complete summary content -->
+                                            <div class="col-md-{% if walk_forward_results.summary.parsed_metrics and walk_forward_results.summary.parsed_metrics|length > 0 %}8{% else %}12{% endif %}">
+                                                <pre class="mb-0"><code>{{ walk_forward_results.summary.content }}</code></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Display comparison data if available -->
+                                {% if walk_forward_results.comparison_files %}
+                                <div class="card mb-4">
+                                    <div class="card-header bg-info text-white">
+                                        <h5 class="mb-0">Performance Comparisons</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="nav nav-tabs" id="comparisonTabs" role="tablist">
+                                            {% for comparison in walk_forward_results.comparison_files %}
+                                            <li class="nav-item" role="presentation">
+                                                <button class="nav-link {% if loop.first %}active{% endif %}" 
+                                                        id="comparison-tab-{{ loop.index }}" 
+                                                        data-bs-toggle="tab" 
+                                                        data-bs-target="#comparison-content-{{ loop.index }}" 
+                                                        type="button" role="tab">
+                                                    {{ comparison.name|replace('.csv', '')|replace('_', ' ')|title }}
+                                                </button>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                        <div class="tab-content mt-3" id="comparisonTabContent">
+                                            {% for comparison in walk_forward_results.comparison_files %}
+                                            <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                                                id="comparison-content-{{ loop.index }}" 
+                                                role="tabpanel">
+                                                <div class="table-responsive">
+                                                    <table class="table table-striped table-bordered">
+                                                        <thead>
+                                                            <tr>
+                                                                {% for key in comparison.data[0].keys() %}
+                                                                <th>{{ key|replace('_', ' ')|title }}</th>
+                                                                {% endfor %}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for row in comparison.data %}
+                                                            <tr>
+                                                                {% for key, value in row.items() %}
+                                                                <td>{{ value }}</td>
+                                                                {% endfor %}
+                                                            </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- In-Sample vs Out-Sample Comparison -->
+                                {% if walk_forward_results.in_sample_data or walk_forward_results.out_sample_data %}
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">In-Sample vs Out-of-Sample Performance</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <!-- In-sample results -->
+                                            <div class="col-md-6">
+                                                <div class="card mb-3">
+                                                    <div class="card-header bg-success text-white">
+                                                        <h6 class="mb-0">In-Sample (Training) Results</h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        {% if walk_forward_results.in_sample_data %}
+                                                        <pre class="mb-0"><code>{{ walk_forward_results.in_sample_data.content }}</code></pre>
+                                                        {% else %}
+                                                        <p class="mb-0">No in-sample results available.</p>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Out-of-sample results -->
+                                            <div class="col-md-6">
+                                                <div class="card mb-3">
+                                                    <div class="card-header bg-danger text-white">
+                                                        <h6 class="mb-0">Out-of-Sample (Testing) Results</h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        {% if walk_forward_results.out_sample_data %}
+                                                        <pre class="mb-0"><code>{{ walk_forward_results.out_sample_data.content }}</code></pre>
+                                                        {% else %}
+                                                        <p class="mb-0">No out-of-sample results available.</p>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Display interactive visualizations -->
+                                {% if walk_forward_results.charts %}
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Walkforward Visualizations</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="nav nav-tabs mb-3" id="wfVisualizationTabs" role="tablist">
+                                            {% for chart in walk_forward_results.charts %}
+                                            <li class="nav-item" role="presentation">
+                                                <button class="nav-link {% if loop.first %}active{% endif %}" 
+                                                        id="wf-viz-tab-{{ loop.index }}" 
+                                                        data-bs-toggle="tab" 
+                                                        data-bs-target="#wf-viz-{{ loop.index }}" 
+                                                        type="button" role="tab">
+                                                    {{ chart.name|replace('.html', '')|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace('_', ' ')|title }}
+                                                </button>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                        <div class="tab-content" id="wfVisualizationTabContent">
+                                            {% for chart in walk_forward_results.charts %}
+                                            <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                                                 id="wf-viz-{{ loop.index }}" 
+                                                 role="tabpanel">
+                                                <div class="text-center">
+                                                    {% if chart.type == 'html' %}
+                                                    <div class="visualization-frame">
+                                                        <iframe src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                                title="{{ chart.name }}"
+                                                                class="w-100"
+                                                                style="height: 700px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
+                                                                loading="lazy"
+                                                                allowfullscreen></iframe>
+                                                    </div>
+                                                    {% else %}
+                                                    <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                         alt="{{ chart.name }}" 
+                                                         class="img-fluid"
+                                                         style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
+                                                         onerror="this.onerror=null; this.src=''; this.alt='Chart image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Chart image not found</div>'">
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Display individual window results (if available in advanced walkforward) -->
+                                {% if walk_forward_results.window_results %}
+                                <div class="accordion mb-4" id="windowAccordion">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Window Details</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="mb-4">Expand each window to see detailed results for that time period.</p>
+                                            
+                                            {% for window in walk_forward_results.window_results %}
+                                            <div class="accordion-item mb-3">
+                                                <h2 class="accordion-header" id="heading{{ loop.index }}">
+                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                                                        {{ window.name|replace('_', ' ')|title }}
+                                                    </button>
+                                                </h2>
+                                                <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#windowAccordion">
+                                                    <div class="accordion-body">
+                                                        <div class="row">
+                                                            <!-- In-sample results -->
+                                                            <div class="col-md-6">
+                                                                <div class="card mb-3">
+                                                                    <div class="card-header bg-success text-white">
+                                                                        <h6 class="mb-0">In-Sample (Training) Results</h6>
+                                                                    </div>
+                                                                    <div class="card-body">
+                                                                        {% if window.in_sample %}
+                                                                        <pre class="mb-0"><code>{{ window.in_sample.content }}</code></pre>
+                                                                        {% else %}
+                                                                        <p class="mb-0">No in-sample results available for this window.</p>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <!-- Out-of-sample results -->
+                                                            <div class="col-md-6">
+                                                                <div class="card mb-3">
+                                                                    <div class="card-header bg-danger text-white">
+                                                                        <h6 class="mb-0">Out-of-Sample (Testing) Results</h6>
+                                                                    </div>
+                                                                    <div class="card-body">
+                                                                        {% if window.out_sample %}
+                                                                        <pre class="mb-0"><code>{{ window.out_sample.content }}</code></pre>
+                                                                        {% else %}
+                                                                        <p class="mb-0">No out-of-sample results available for this window.</p>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <!-- Window-specific charts -->
+                                                            {% if window.charts %}
+                                                            <div class="col-md-12">
+                                                                <div class="card">
+                                                                    <div class="card-header">
+                                                                        <h6 class="mb-0">Window Charts</h6>
+                                                                    </div>
+                                                                    <div class="card-body">
+                                                                        <div class="row">
+                                                                            {% for chart in window.charts %}
+                                                                            <div class="col-md-6 mb-3">
+                                                                                <div class="card">
+                                                                                    <div class="card-header">
+                                                                                        <h6 class="mb-0">{{ chart.name|replace('.html', '')|replace('.png', '')|replace('.jpg', '')|replace('.jpeg', '')|replace('_', ' ')|title }}</h6>
+                                                                                    </div>
+                                                                                    <div class="card-body text-center">
+                                                                                        {% if chart.type == 'html' %}
+                                                                                        <div class="visualization-frame">
+                                                                                            <iframe src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                                                                    title="{{ chart.name }}"
+                                                                                                    class="w-100"
+                                                                                                    style="height: 400px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
+                                                                                                    loading="lazy"
+                                                                                                    allowfullscreen></iframe>
+                                                                                        </div>
+                                                                                        {% else %}
+                                                                                        <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                                                             alt="{{ chart.name }}" 
+                                                                                             class="img-fluid"
+                                                                                             style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;"
+                                                                                             onerror="this.onerror=null; this.src=''; this.alt='Chart image not found'; this.parentElement.innerHTML += '<div class=\'alert alert-warning\'>Chart image not found</div>'">
+                                                                                        {% endif %}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                            {% endfor %}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                {% endif %}
             </div>
             {% endif %}
         </div>
     </div>
+    
+    <!-- Dark Mode Toggle Button -->
+    <button id="mode-toggle" class="mode-toggle" title="Toggle dark/light mode">
+        <i class="bi bi-moon-stars-fill" id="dark-mode-icon"></i>
+        <i class="bi bi-sun-fill" id="light-mode-icon" style="display: none;"></i>
+    </button>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Prepare template variables for JavaScript -->
     <script>
+        // Define equity curve data variables from template
+        {% if equity_curve and equity_curve.dates and equity_curve.equity and equity_curve.dates|length > 0 and equity_curve.equity|length > 0 %}
+        var hasEquityCurveData = true;
+        var equityDates = {{ equity_curve.dates|tojson }};
+        var equityValues = {{ equity_curve.equity|tojson }};
+        {% else %}
+        var hasEquityCurveData = false;
+        var equityDates = [];
+        var equityValues = [];
+        {% endif %}
+    </script>
+    
+    <!-- Main JavaScript code -->
+    <script>
+        // Ensure Bootstrap's tab plugin is properly initialized
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize all Bootstrap tabs
-            const tabElements = document.querySelectorAll('[data-bs-toggle="tab"]');
-            tabElements.forEach(tab => {
-                new bootstrap.Tab(tab);
-            });
-            
-            // Add specific activation for Monte Carlo tabs to ensure they work
-            document.querySelectorAll('#mcVisualizationTabs .nav-link').forEach(function(tabEl) {
-                tabEl.addEventListener('click', function(event) {
-                    event.preventDefault();
-                    
-                    // Hide all tab contents
-                    document.querySelectorAll('#mcVisualizationsContent .tab-pane').forEach(function(contentEl) {
-                        contentEl.classList.remove('show', 'active');
-                    });
-                    
-                    // Deactivate all tabs
-                    document.querySelectorAll('#mcVisualizationTabs .nav-link').forEach(function(tab) {
-                        tab.classList.remove('active');
-                        tab.setAttribute('aria-selected', 'false');
-                    });
-                    
-                    // Activate clicked tab
-                    this.classList.add('active');
-                    this.setAttribute('aria-selected', 'true');
-                    
-                    // Show corresponding content
-                    const target = this.getAttribute('data-bs-target');
-                    const content = document.querySelector(target);
-                    if (content) {
-                        content.classList.add('show', 'active');
-                    }
-                });
-            });
-            
-            // Ensure first Monte Carlo tab is active on page load
-            const firstMcTab = document.querySelector('#mcVisualizationTabs .nav-link.active');
-            if (firstMcTab) {
-                const target = firstMcTab.getAttribute('data-bs-target');
-                const content = document.querySelector(target);
-                if (content) {
-                    content.classList.add('show', 'active');
-                }
-            }
-            
-            {% if equity_curve and equity_curve.dates and equity_curve.equity and equity_curve.dates|length > 0 and equity_curve.equity|length > 0 %}
-            // Render equity curve chart
-            const equityCtx = document.getElementById('equityCurveChart');
-            if (equityCtx) {
-                const ctxElement = equityCtx.getContext('2d');
-                const equityDates = {{ equity_curve.dates|tojson }};
-                const equityValues = {{ equity_curve.equity|tojson }};
+            // Enable all tabs and pills for proper navigation
+            const tabTogglers = document.querySelectorAll('[data-bs-toggle="tab"], [data-bs-toggle="pill"]');
+            tabTogglers.forEach(function(element) {
+                new bootstrap.Tab(element);
                 
-                // Create a simple equity curve chart
-                new Chart(ctxElement, {
-                    type: 'line',
-                    data: {
-                        labels: equityDates,
-                        datasets: [
-                            {
-                                label: 'Equity Curve',
-                                data: equityValues,
-                                borderColor: 'rgb(75, 192, 192)',
-                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                                tension: 0.1,
-                                fill: true
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: false,
-                                title: {
-                                    display: true,
-                                    text: 'Account Value'
-                                }
-                            },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Date'
-                                }
-                            }
-                        },
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'Equity Curve',
-                                font: {
-                                    size: 16
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        if (label) {
-                                            label += ': ';
-                                        }
-                                        if (context.parsed.y !== null) {
-                                            label += new Intl.NumberFormat('en-US', {
-                                                style: 'currency',
-                                                currency: 'USD',
-                                                minimumFractionDigits: 2
-                                            }).format(context.parsed.y);
-                                        }
-                                        return label;
-                                    }
-                                }
-                            },
-                            legend: {
-                                display: true,
-                                position: 'top'
-                            }
+                // For pills, we need a custom handler
+                element.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    const targetId = this.getAttribute('data-bs-target');
+                    const targetPane = document.querySelector(targetId);
+                    
+                    if (targetPane) {
+                        // Hide all sibling tab panes
+                        const siblingPanes = targetPane.parentElement.querySelectorAll('.tab-pane');
+                        siblingPanes.forEach(pane => {
+                            pane.classList.remove('show', 'active');
+                        });
+                        
+                        // Remove active class from all tabs in the same group
+                        const siblingTabs = this.closest('ul').querySelectorAll('[data-bs-toggle]');
+                        siblingTabs.forEach(tab => {
+                            tab.classList.remove('active');
+                            tab.setAttribute('aria-selected', 'false');
+                        });
+                        
+                        // Activate the target tab and tab pane
+                        this.classList.add('active');
+                        this.setAttribute('aria-selected', 'true');
+                        targetPane.classList.add('show', 'active');
+                        
+                        // For HTML visualizations, ensure iframe is properly sized
+                        const iframe = targetPane.querySelector('iframe');
+                        if (iframe && this.closest('#mcVisualizationTabs')) {
+                            // Make sure iframe is properly visible and sized
+                            setTimeout(() => {
+                                iframe.style.height = '700px';
+                                iframe.style.minHeight = '700px';
+                            }, 50);
                         }
                     }
                 });
+            });
+            
+            // Set up tab activation event listeners for Monte Carlo section
+            const mcTab = document.getElementById('monte-carlo-tab');
+            if (mcTab) {
+                // Listen for tab activation to ensure iframes are properly loaded
+                mcTab.addEventListener('shown.bs.tab', function () {
+                    // Force reload of all iframes when the Monte Carlo tab becomes visible
+                    setTimeout(() => {
+                        console.log("Monte Carlo tab activated - reloading iframes");
+                        const iframes = document.querySelectorAll('.visualization-frame iframe');
+                        iframes.forEach(iframe => {
+                            // Reload the iframe content with a timestamp to avoid caching
+                            const currentSrc = iframe.src;
+                            const refreshUrl = currentSrc.includes('?') 
+                                ? currentSrc + '&_refresh=' + new Date().getTime() 
+                                : currentSrc + '?_refresh=' + new Date().getTime();
+                            console.log("Reloading iframe: " + refreshUrl);
+                            iframe.src = refreshUrl;
+                        });
+                    }, 100);
+                });
+                
+                // Activate Monte Carlo tab on page load if requested via URL hash
+                if (location.hash === '#monte-carlo') {
+                    setTimeout(() => {
+                        const tabInstance = new bootstrap.Tab(mcTab);
+                        tabInstance.show();
+                    }, 100);
+                }
             }
-            {% endif %}
+            
+            // Dark mode functionality
+            const darkModeToggle = document.getElementById('mode-toggle');
+            const darkModeIcon = document.getElementById('dark-mode-icon');
+            const lightModeIcon = document.getElementById('light-mode-icon');
+            
+            // Check for saved theme preference or use preferred color scheme
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            // Apply theme based on saved preference or system preference
+            if (savedTheme === 'dark' || (!savedTheme && prefersDarkMode)) {
+                enableDarkMode();
+            } else {
+                enableLightMode();
+            }
+            
+            // Toggle between dark and light mode
+            darkModeToggle.addEventListener('click', function() {
+                if (document.body.classList.contains('dark-mode')) {
+                    enableLightMode();
+                } else {
+                    enableDarkMode();
+                }
+            });
+            
+            function enableDarkMode() {
+                document.body.classList.add('dark-mode');
+                darkModeIcon.style.display = 'none';
+                lightModeIcon.style.display = 'block';
+                localStorage.setItem('theme', 'dark');
+                
+                // Update Chart.js options for all charts if needed
+                if (window.Chart && window.Chart.instances) {
+                    Object.values(window.Chart.instances).forEach(chart => {
+                        chart.options.scales.x.grid.color = 'rgba(255, 255, 255, 0.1)';
+                        chart.options.scales.y.grid.color = 'rgba(255, 255, 255, 0.1)';
+                        chart.options.scales.x.ticks.color = '#e0e0e0';
+                        chart.options.scales.y.ticks.color = '#e0e0e0';
+                        chart.update();
+                    });
+                }
+            }
+            
+            function enableLightMode() {
+                document.body.classList.remove('dark-mode');
+                darkModeIcon.style.display = 'block';
+                lightModeIcon.style.display = 'none';
+                localStorage.setItem('theme', 'light');
+                
+                // Update Chart.js options for all charts if needed
+                if (window.Chart && window.Chart.instances) {
+                    Object.values(window.Chart.instances).forEach(chart => {
+                        chart.options.scales.x.grid.color = 'rgba(0, 0, 0, 0.1)';
+                        chart.options.scales.y.grid.color = 'rgba(0, 0, 0, 0.1)';
+                        chart.options.scales.x.ticks.color = '#666';
+                        chart.options.scales.y.ticks.color = '#666';
+                        chart.update();
+                    });
+                }
+            }
+            
+            // Initialize equity curve chart if data exists
+            function initEquityCurve() {
+                if (hasEquityCurveData) {
+                    const equityCtx = document.getElementById('equityCurveChart');
+                    if (equityCtx) {
+                        const ctxElement = equityCtx.getContext('2d');
+                        
+                        // Create a simple equity curve chart
+                        new Chart(ctxElement, {
+                            type: 'line',
+                            data: {
+                                labels: equityDates,
+                                datasets: [
+                                    {
+                                        label: 'Equity Curve',
+                                        data: equityValues,
+                                        borderColor: 'rgb(75, 192, 192)',
+                                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                        tension: 0.1,
+                                        fill: true
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: {
+                                    mode: 'index',
+                                    intersect: false
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: false,
+                                        title: {
+                                            display: true,
+                                            text: 'Account Value'
+                                        }
+                                    },
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: 'Date'
+                                        }
+                                    }
+                                },
+                                plugins: {
+                                    title: {
+                                        display: true,
+                                        text: 'Equity Curve',
+                                        font: {
+                                            size: 16
+                                        }
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                let label = context.dataset.label || '';
+                                                if (label) {
+                                                    label += ': ';
+                                                }
+                                                if (context.parsed.y !== null) {
+                                                    label += new Intl.NumberFormat('en-US', {
+                                                        style: 'currency',
+                                                        currency: 'USD',
+                                                        minimumFractionDigits: 2
+                                                    }).format(context.parsed.y);
+                                                }
+                                                return label;
+                                            }
+                                        }
+                                    },
+                                    legend: {
+                                        display: true,
+                                        position: 'top'
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+            
+            // Initialize the equity curve chart
+            initEquityCurve();
         });
     </script>
 </body>
