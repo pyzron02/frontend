@@ -43,6 +43,8 @@ app.secret_key = os.getenv('SECRET_KEY', 'trading_strategy_backtester_secret_key
 DEFAULT_START_DATE = os.getenv('DEFAULT_START_DATE', '2020-01-01')
 DEFAULT_END_DATE = os.getenv('DEFAULT_END_DATE', '2025-01-01')
 DEFAULT_NUM_SIMULATIONS = int(os.getenv('DEFAULT_NUM_SIMULATIONS', '100'))
+DEFAULT_WALK_FORWARD_WINDOWS = int(os.getenv('DEFAULT_WALK_FORWARD_WINDOWS', '5'))
+DEFAULT_IN_SAMPLE_PCT = float(os.getenv('DEFAULT_IN_SAMPLE_PCT', '0.7'))
 
 # Configure template folder
 app.template_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
@@ -54,18 +56,52 @@ def get_workflow_type_from_folder(folder_name):
     For example: MultiPosition_complete_20250421_204646_6a8f39e2
     
     Returns:
-        str: Workflow type (simple, optimization, monte_carlo, complete)
+        str: Workflow type (simple, optimization, monte_carlo, walk_forward, complete)
              or None if not detected
     """
-    # Common workflow types
-    workflow_types = ["simple", "optimization", "monte_carlo", "complete"]
+    # Common workflow types with their variants
+    workflow_mapping = {
+        "simple": ["simple"],
+        "optimization": ["optimization", "optimize", "opt"],
+        "monte_carlo": ["monte_carlo", "montecarlo", "monte-carlo"],
+        "walk_forward": ["walk_forward", "walkforward", "walk-forward", "wf"],
+        "complete": ["complete", "full", "all"]
+    }
     
-    # Check if any of the known workflow types are in the folder name
-    for workflow in workflow_types:
-        if f"_{workflow}_" in folder_name:
-            return workflow
+    # Normalize the folder name to lowercase for case-insensitive matching
+    folder_lower = folder_name.lower()
     
-    # If no match, try to infer from directory structure
+    # First attempt: look for exact matches with underscore patterns
+    for workflow_type, variants in workflow_mapping.items():
+        for variant in variants:
+            # Check for pattern like "_variant_" (standard format)
+            if f"_{variant}_" in folder_lower:
+                return workflow_type
+    
+    # Second attempt: look for the variants anywhere in the name
+    for workflow_type, variants in workflow_mapping.items():
+        for variant in variants:
+            if variant in folder_lower:
+                return workflow_type
+    
+    # Third attempt: check for directory structure to infer the type
+    # Especially useful for complete workflow runs that have subdirectories
+    if os.path.isdir(os.path.join(project_root, 'output', folder_name)):
+        folder_path = os.path.join(project_root, 'output', folder_name)
+        
+        # Look for subdirectories that indicate workflow type
+        if os.path.exists(os.path.join(folder_path, '03_walkforward')) or os.path.exists(os.path.join(folder_path, '03_walk_forward')):
+            return "complete"  # Complete workflow with walk forward analysis
+        elif os.path.exists(os.path.join(folder_path, 'walkforward_summary.txt')) or os.path.exists(os.path.join(folder_path, 'walk_forward_summary.txt')):
+            return "walk_forward"
+        elif os.path.exists(os.path.join(folder_path, '04_monte_carlo')) or os.path.exists(os.path.join(folder_path, '03_monte_carlo')):
+            return "complete"  # Complete workflow with Monte Carlo analysis
+        elif os.path.exists(os.path.join(folder_path, 'monte_carlo_summary.txt')):
+            return "monte_carlo"
+        elif os.path.exists(os.path.join(folder_path, '02_optimization')) or any('optimization_summary' in f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))):
+            return "optimization"
+                
+    # If no match, return None
     return None
 
 def get_output_folders():
@@ -224,7 +260,8 @@ def get_equity_curve(output_path):
         "simple": [""],  # Just the main folder
         "optimization": ["02_optimization", ""],
         "monte_carlo": ["03_monte_carlo/backtest", "03_monte_carlo", ""],
-        "complete": ["04_optimized_backtest", "01_backtest", ""],
+        "walk_forward": ["out_sample", "combined", ""],  # Check out-of-sample first for walkforward
+        "complete": ["05_optimized_backtest", "04_optimized_backtest", "03_walkforward/out_sample", "03_walk_forward/out_sample", "01_simple_backtest", ""],
         None: [""]  # Default to main folder if workflow type not detected
     }
     
@@ -463,8 +500,13 @@ def get_monte_carlo_charts(folder_path):
     
     # Function to check if a file is a monte carlo related chart
     def is_monte_carlo_chart(filename):
+        # Check for drawdowns_comparison.html specifically and exclude it
+        if 'drawdowns_comparison' in filename.lower():
+            return False
+        
+        # Include other monte carlo related charts
         return (filename.endswith('.html') or filename.endswith('.png')) and any(x in filename.lower() for x in 
-                                              ['monte_carlo', 'return_distribution', 'drawdown', 'dashboard'])
+                                              ['monte_carlo', 'return_distribution', 'dashboard'])
     
     # Check main directory first
     for file in os.listdir(folder_path):
@@ -540,14 +582,15 @@ def get_monte_carlo_charts(folder_path):
     # Then prioritize HTML files over PNG for each base name
     prioritized_charts = []
     for base_name, chart_list in chart_groups.items():
-        # Find HTML files first
+        # Find HTML files first - always include ALL HTML charts
         html_charts = [c for c in chart_list if c['type'] == 'html']
         if html_charts:
-            # If HTML version exists, use it
-            prioritized_charts.append(html_charts[0])
-            print(f"Selected HTML version of {base_name}")
+            # Include all HTML versions
+            for html_chart in html_charts:
+                prioritized_charts.append(html_chart)
+                print(f"Added HTML chart: {html_chart['name']}")
         else:
-            # Otherwise use PNG version
+            # Otherwise use PNG version (just one)
             png_charts = [c for c in chart_list if c['type'] == 'png']
             if png_charts:
                 prioritized_charts.append(png_charts[0])
@@ -585,13 +628,21 @@ def get_equity_curve_description(workflow_type):
         strategy robustness. This gives a more realistic picture of expected performance by accounting 
         for market randomness. Check the Monte Carlo tab for the distribution of possible outcomes.</p>
         """
+    elif workflow_type == "walk_forward":
+        base_description = """
+        <h5>Walk Forward Workflow Equity Curve</h5>
+        <p>This equity curve shows performance using <strong>walk forward analysis</strong>. In this method, 
+        the strategy is optimized on an in-sample period and then tested on an out-of-sample period repeatedly 
+        across the entire time series. This helps prevent overfitting by continually validating the strategy's 
+        performance on unseen data. The resulting equity curve represents the performance on out-of-sample data only.</p>
+        """
     elif workflow_type == "complete":
         base_description = """
         <h5>Complete Workflow Equity Curve</h5>
-        <p>This equity curve combines the benefits of both optimization and Monte Carlo testing. 
-        It shows the performance of optimized parameters that have also been validated through 
-        Monte Carlo simulations. This is the most comprehensive view of how your strategy might 
-        perform in real market conditions.</p>
+        <p>This equity curve combines the benefits of optimization, Monte Carlo testing, and walk forward analysis. 
+        It shows the performance of optimized parameters that have been validated through both Monte Carlo simulations 
+        and walk forward testing. This is the most comprehensive view of how your strategy might perform in real market 
+        conditions, accounting for both market randomness and parameter stability.</p>
         """
     else:
         base_description = """
@@ -602,17 +653,316 @@ def get_equity_curve_description(workflow_type):
         
     return base_description
 
+def get_walk_forward_results(folder_path):
+    """Get walk forward analysis results if available"""
+    print(f"Looking for walk forward results in {folder_path}")
+    
+    # Extract folder name from path
+    folder_name = os.path.basename(folder_path)
+    
+    # Check for walk forward results folder first (prioritize different possible locations)
+    possible_wf_dirs = [
+        os.path.join(folder_path, "03_walkforward"),
+        os.path.join(folder_path, "03_walk_forward"),
+        folder_path  # For standalone walkforward runs
+    ]
+    
+    walk_forward_dir = None
+    for potential_dir in possible_wf_dirs:
+        if os.path.exists(potential_dir):
+            # Check if this directory has walkforward files
+            if any('walkforward' in f.lower() for f in os.listdir(potential_dir)
+                  if f.endswith('.txt') or f.endswith('.html') or f.endswith('.csv')):
+                walk_forward_dir = potential_dir
+                print(f"Found walk forward directory at {walk_forward_dir}")
+                break
+    
+    # If not found in predefined locations, check for directories with walk_forward in the name
+    if not walk_forward_dir:
+        for subdir in os.listdir(folder_path):
+            if ('walk_forward' in subdir.lower() or 'walkforward' in subdir.lower()) and os.path.isdir(os.path.join(folder_path, subdir)):
+                walk_forward_dir = os.path.join(folder_path, subdir)
+                print(f"Found walk forward directory from subdirectory search: {walk_forward_dir}")
+                break
+    
+    if not walk_forward_dir:
+        print(f"No walk forward directory found in {folder_path}")
+        return None
+        
+    results = {
+        'summary': None,
+        'performance_metrics': None,
+        'in_sample_data': None,
+        'out_sample_data': None,
+        'window_results': [],
+        'charts': [],
+        'comparison_files': []
+    }
+    
+    # Look for walkforward summary file first
+    for file in os.listdir(walk_forward_dir):
+        if 'summary' in file.lower() and file.endswith('.txt'):
+            summary_path = os.path.join(walk_forward_dir, file)
+            try:
+                with open(summary_path, 'r') as f:
+                    content = f.read()
+                
+                # Parse summary to extract performance metrics
+                metrics = {}
+                reading_metrics = False
+                
+                for line in content.splitlines():
+                    if 'Performance Metrics:' in line:
+                        reading_metrics = True
+                        continue
+                    elif reading_metrics and '---' in line:
+                        reading_metrics = False
+                        continue
+                    elif reading_metrics and ':' in line:
+                        try:
+                            key, value = line.split(':', 1)
+                            metrics[key.strip()] = value.strip()
+                        except Exception as e:
+                            print(f"Error parsing metric line: {line}, {e}")
+                
+                results['summary'] = {
+                    'path': summary_path,
+                    'content': content,
+                    'name': file,
+                    'parsed_metrics': metrics
+                }
+                print(f"Found walkforward summary file: {file}")
+                break
+            except Exception as e:
+                print(f"Error reading walkforward summary file: {e}")
+    
+    # Look for comparison files
+    for file in os.listdir(walk_forward_dir):
+        if ('comparison' in file.lower() or 'combined' in file.lower()) and file.endswith('.csv'):
+            comparison_path = os.path.join(walk_forward_dir, file)
+            try:
+                # Read CSV into pandas DataFrame
+                df = pd.read_csv(comparison_path)
+                results['comparison_files'].append({
+                    'path': comparison_path,
+                    'name': file,
+                    'data': df.to_dict(orient='records')
+                })
+                print(f"Found comparison file: {file}")
+            except Exception as e:
+                print(f"Error reading comparison file {file}: {e}")
+    
+    # Check for in-sample and out-of-sample directories
+    in_sample_dir = os.path.join(walk_forward_dir, 'in_sample')
+    out_sample_dir = os.path.join(walk_forward_dir, 'out_sample')
+    
+    # Process in-sample directory if it exists
+    if os.path.exists(in_sample_dir):
+        print(f"Found in_sample directory at {in_sample_dir}")
+        
+        # Read results.txt if available
+        results_path = os.path.join(in_sample_dir, 'results.txt')
+        if os.path.exists(results_path):
+            try:
+                with open(results_path, 'r') as f:
+                    content = f.read()
+                results['in_sample_data'] = {
+                    'path': results_path,
+                    'content': content,
+                    'name': 'results.txt'
+                }
+                print(f"Found in-sample results file")
+            except Exception as e:
+                print(f"Error reading in-sample results: {e}")
+        
+        # Try to get equity curve
+        equity_path = os.path.join(in_sample_dir, 'equity_curve.csv')
+        if os.path.exists(equity_path):
+            try:
+                df = pd.read_csv(equity_path)
+                results['in_sample_equity'] = {
+                    'path': equity_path,
+                    'data': df.to_dict(orient='records')
+                }
+                print(f"Found in-sample equity curve file")
+            except Exception as e:
+                print(f"Error reading in-sample equity curve: {e}")
+    
+    # Process out-sample directory if it exists
+    if os.path.exists(out_sample_dir):
+        print(f"Found out_sample directory at {out_sample_dir}")
+        
+        # Read results.txt if available
+        results_path = os.path.join(out_sample_dir, 'results.txt')
+        if os.path.exists(results_path):
+            try:
+                with open(results_path, 'r') as f:
+                    content = f.read()
+                results['out_sample_data'] = {
+                    'path': results_path,
+                    'content': content,
+                    'name': 'results.txt'
+                }
+                print(f"Found out-sample results file")
+            except Exception as e:
+                print(f"Error reading out-sample results: {e}")
+        
+        # Try to get equity curve
+        equity_path = os.path.join(out_sample_dir, 'equity_curve.csv')
+        if os.path.exists(equity_path):
+            try:
+                df = pd.read_csv(equity_path)
+                results['out_sample_equity'] = {
+                    'path': equity_path,
+                    'data': df.to_dict(orient='records')
+                }
+                print(f"Found out-sample equity curve file")
+            except Exception as e:
+                print(f"Error reading out-sample equity curve: {e}")
+    
+    # Look for individual window results (if any)
+    window_dirs = []
+    for item in os.listdir(walk_forward_dir):
+        item_path = os.path.join(walk_forward_dir, item)
+        if os.path.isdir(item_path) and ('window' in item.lower() or 'period' in item.lower()):
+            window_dirs.append(item_path)
+    
+    # If we found window directories, process them
+    if window_dirs:
+        print(f"Found {len(window_dirs)} window directories")
+        
+        # Sort window directories by name/number if possible
+        window_dirs.sort(key=lambda x: int(re.search(r'(\d+)', os.path.basename(x)).group(1)) 
+                         if re.search(r'(\d+)', os.path.basename(x)) else os.path.basename(x))
+        
+        # Process each window directory
+        for window_dir in window_dirs:
+            window_name = os.path.basename(window_dir)
+            window_result = {
+                'name': window_name,
+                'path': window_dir,
+                'in_sample': None,
+                'out_sample': None,
+                'charts': []
+            }
+            
+            # Check for in-sample and out-of-sample subdirectories
+            in_sample_dir = os.path.join(window_dir, 'in_sample')
+            out_sample_dir = os.path.join(window_dir, 'out_sample')
+            
+            if os.path.exists(in_sample_dir):
+                # Look for optimization results in in-sample data
+                for file in os.listdir(in_sample_dir):
+                    if 'best_params' in file.lower() or 'optimization' in file.lower() or file == 'results.txt':
+                        file_path = os.path.join(in_sample_dir, file)
+                        try:
+                            with open(file_path, 'r') as f:
+                                content = f.read()
+                            window_result['in_sample'] = {
+                                'path': file_path,
+                                'content': content,
+                                'name': file
+                            }
+                            break
+                        except Exception:
+                            pass
+            
+            if os.path.exists(out_sample_dir):
+                # Look for performance metrics in out-of-sample data
+                for file in os.listdir(out_sample_dir):
+                    if 'summary' in file.lower() or 'metrics' in file.lower() or 'performance' in file.lower() or file == 'results.txt':
+                        file_path = os.path.join(out_sample_dir, file)
+                        try:
+                            with open(file_path, 'r') as f:
+                                content = f.read()
+                            window_result['out_sample'] = {
+                                'path': file_path,
+                                'content': content,
+                                'name': file
+                            }
+                            break
+                        except Exception:
+                            pass
+            
+            # Look for equity curves and other charts
+            for subdir in [window_dir, in_sample_dir, out_sample_dir]:
+                if os.path.exists(subdir):
+                    for file in os.listdir(subdir):
+                        if file.endswith(('.png', '.jpg', '.jpeg', '.html')) and ('curve' in file.lower() or 'chart' in file.lower() or 'plot' in file.lower()):
+                            chart_path = os.path.join(subdir, file)
+                            window_result['charts'].append({
+                                'path': chart_path,
+                                'name': file,
+                                'type': 'html' if file.endswith('.html') else 'image'
+                            })
+            
+            results['window_results'].append(window_result)
+    
+    # Look for overall equity curves and walk forward charts
+    visualization_files = [
+        'equity_curves.html',
+        'drawdowns_comparison.html',
+        'monthly_returns_comparison.html'
+    ]
+    
+    for file in os.listdir(walk_forward_dir):
+        # Check for exact matches to our expected visualization files
+        # Use the folder's strategy name, not the undefined strategy_name variable
+        folder_strategy_name = folder_name.split('_')[0] if '_' in folder_name else ''
+        strategy_viz_files = [f"{folder_strategy_name}_{viz}" for viz in visualization_files]
+        is_known_viz = any(file.endswith(viz) for viz in visualization_files) or any(file == viz for viz in strategy_viz_files)
+        
+        # Also check for other HTML/image files that look like visualizations
+        is_other_viz = file.endswith(('.png', '.jpg', '.jpeg', '.html')) and (
+            'curve' in file.lower() or 'chart' in file.lower() or 
+            'plot' in file.lower() or 'performance' in file.lower() or 
+            'comparison' in file.lower()
+        )
+        
+        if is_known_viz or is_other_viz:
+            chart_path = os.path.join(walk_forward_dir, file)
+            print(f"Found walkforward visualization: {file}")
+            results['charts'].append({
+                'path': chart_path,
+                'name': file,
+                'type': 'html' if file.endswith('.html') else 'image'
+            })
+    
+    has_results = (
+        results['summary'] is not None or 
+        results['performance_metrics'] is not None or 
+        results['window_results'] or 
+        results['charts'] or
+        results['in_sample_data'] is not None or
+        results['out_sample_data'] is not None or
+        results['comparison_files']
+    )
+    
+    return results if has_results else None
+
 @app.route('/')
 def index():
     """Landing page with form to execute backtests"""
     # Get list of registered strategies
     strategies = get_registered_strategies()
     
+    # Define available workflow types
+    workflow_types = [
+        {"id": "simple", "name": "Simple Backtest", "description": "Basic backtest with fixed parameters"},
+        {"id": "optimization", "name": "Parameter Optimization", "description": "Find optimal strategy parameters"},
+        {"id": "monte_carlo", "name": "Monte Carlo Analysis", "description": "Test strategy robustness with multiple simulations"},
+        {"id": "walk_forward", "name": "Walk Forward Analysis", "description": "Test strategy across multiple time windows"},
+        {"id": "complete", "name": "Complete Workflow", "description": "Run all analysis steps (optimization, walk forward, monte carlo)"}
+    ]
+    
     return render_template('index.html', 
                            strategies=strategies,
+                           workflow_types=workflow_types,
                            default_start_date=DEFAULT_START_DATE,
                            default_end_date=DEFAULT_END_DATE,
-                           default_num_simulations=DEFAULT_NUM_SIMULATIONS)
+                           default_num_simulations=DEFAULT_NUM_SIMULATIONS,
+                           default_walk_forward_windows=DEFAULT_WALK_FORWARD_WINDOWS,
+                           default_in_sample_pct=DEFAULT_IN_SAMPLE_PCT)
 
 @app.route('/strategy/<strategy_name>')
 def strategy_params(strategy_name):
@@ -758,7 +1108,21 @@ def view_result(folder_name):
         
         trade_log = get_trade_log(folder_path)
         optimization_results = get_optimization_results(folder_path)
-        monte_carlo_charts = get_monte_carlo_charts(folder_path)
+        
+        # For walk forward workflow, set monte_carlo_charts to None to hide the tab
+        monte_carlo_charts = None if workflow_type == 'walk_forward' else get_monte_carlo_charts(folder_path)
+        
+        # Enhanced debug logging for Monte Carlo charts
+        if monte_carlo_charts:
+            print(f"Monte Carlo charts details for {folder_name}:")
+            print(f"Found {len(monte_carlo_charts)} charts")
+            for i, chart in enumerate(monte_carlo_charts):
+                print(f"Chart {i+1}: {chart['name']} - type: {chart['type']}")
+        else:
+            print(f"No Monte Carlo charts found for {folder_name}")
+        
+        # Get walk forward results if available
+        walk_forward_results = get_walk_forward_results(folder_path) if workflow_type in ['walk_forward', 'complete'] else None
         
         # Get equity curve description based on workflow type
         equity_curve_description = get_equity_curve_description(workflow_type)
@@ -776,6 +1140,7 @@ def view_result(folder_name):
             trade_log=trade_log,
             optimization_results=optimization_results,
             monte_carlo_charts=monte_carlo_charts,
+            walk_forward_results=walk_forward_results,
             project_root=project_root,
             equity_curve_description=equity_curve_description
         )
@@ -819,7 +1184,7 @@ def run_backtest():
             "initial_capital": initial_capital,
             "commission": 0.001,
             "plot": False,
-            "enhanced_plots": True if workflow_type in ["monte_carlo", "complete"] else False,
+            "enhanced_plots": True if workflow_type in ["monte_carlo", "walk_forward", "complete"] else False,
             "verbose": request.form.get('verbose') == 'on'
         },
         "strategies": {
@@ -905,7 +1270,7 @@ def run_backtest():
                 return redirect(url_for('index'))
     
     # Add parameters to config
-    if workflow_type in ['optimization', 'complete']:
+    if workflow_type in ['optimization', 'walk_forward', 'complete']:
         if parameter_grid:
             config["strategies"][strategy]["parameter_grid"] = parameter_grid
             print(f"Using parameter grid: {parameter_grid}")
@@ -933,7 +1298,7 @@ def run_backtest():
         print(f"Using parameters: {parameters}")
     
     # Add specific parameters for different workflow types
-    if workflow_type in ['optimization', 'complete']:
+    if workflow_type in ['optimization', 'walk_forward', 'complete']:
         # Get the optimization metric from the form
         optimization_metric = request.form.get('optimization_metric', 'sharpe_ratio')
         
@@ -960,6 +1325,24 @@ def run_backtest():
             "n_simulations": int(request.form.get('n_simulations', DEFAULT_NUM_SIMULATIONS)),
             "keep_permuted_data": request.form.get('keep_permuted_data') == 'on'
         }
+        
+    if workflow_type in ['walk_forward', 'complete']:
+        # Add walk forward specific parameters
+        config["strategies"][strategy]["walk_forward"] = {
+            "n_windows": int(request.form.get('n_windows', 5)),
+            "in_sample_pct": float(request.form.get('in_sample_pct', 0.7)),
+            "anchor": request.form.get('anchor', 'rolling') == 'rolling',
+            "optimization_metric": mapped_metric if workflow_type in ['optimization', 'walk_forward', 'complete'] else 'sharpe_ratio'
+        }
+        
+        # Add walk forward specific parameters for display in frontend
+        if workflow_type == 'walk_forward':
+            # Ensure we have optimization parameters for walk forward
+            if "optimization" not in config["strategies"][strategy]:
+                config["strategies"][strategy]["optimization"] = {
+                    "n_trials": int(request.form.get('n_trials', 50)),
+                    "optimization_metric": mapped_metric
+                }
     
     # Create config directory if it doesn't exist
     config_dir = os.path.join(project_root, 'input', 'workflow_configs')
