@@ -1,0 +1,39 @@
+{
+    "app": {
+        "secret_key": "your_secret_key_change_this_in_production",
+        "debug": true,
+        "port": 5000,
+        "host": "0.0.0.0"
+    },
+    "backtester": {
+        "project_root": "/trading-strategy-backtester",
+        "output_dir": "/trading-strategy-backtester/output",
+        "temp_dir": "/app/temp",
+        "default_parameters": {
+            "start_date": "2015-01-01",
+            "end_date": "2021-12-31",
+            "in_sample_ratio": 0.7,
+            "num_simulations": 1000
+        },
+        "strategy_defaults": {
+            "SimpleStock": {
+                "sma_period": 20,
+                "position_size": 100
+            },
+            "MACrossover": {
+                "fast_period": 10,
+                "slow_period": 30,
+                "position_size": 100
+            },
+            "MultiPosition": {
+                "sma_period": 20,
+                "position_size": 50,
+                "max_positions": 5
+            },
+            "AuctionMarket": {
+                "lookback_period": 20,
+                "position_size": 100
+            }
+        }
+    }
+} 
