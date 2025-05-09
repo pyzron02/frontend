@@ -278,24 +278,19 @@
                 <button class="nav-link" id="trades-tab" data-bs-toggle="tab" data-bs-target="#trades" type="button" role="tab" aria-controls="trades" aria-selected="false">Trades</button>
             </li>
             {% endif %}
-            {% if optimization_results %}
+            {% if optimization_results and tab_visibility.optimization %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="optimization-tab" data-bs-toggle="tab" data-bs-target="#optimization" type="button" role="tab" aria-controls="optimization" aria-selected="false">Optimization</button>
             </li>
             {% endif %}
-            {% if workflow_type != "complete" and workflow_type != "walk_forward" and monte_carlo_charts %}
+            {% if monte_carlo_charts and tab_visibility.monte_carlo %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="monte-carlo-tab" data-bs-toggle="tab" data-bs-target="#monte-carlo" type="button" role="tab" aria-controls="monte-carlo" aria-selected="false">Monte Carlo</button>
             </li>
             {% endif %}
-            {% if walk_forward_results %}
+            {% if walk_forward_results and tab_visibility.walk_forward %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="walk-forward-tab" data-bs-toggle="tab" data-bs-target="#walk-forward" type="button" role="tab" aria-controls="walk-forward" aria-selected="false">Walk Forward</button>
-            </li>
-            {% endif %}
-            {% if workflow_type == "complete" and monte_carlo_charts %}
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="monte-carlo-tab" data-bs-toggle="tab" data-bs-target="#monte-carlo" type="button" role="tab" aria-controls="monte-carlo" aria-selected="false">Monte Carlo</button>
             </li>
             {% endif %}
         </ul>
@@ -513,7 +508,17 @@
                                                 class="w-100"
                                                 style="height: 900px; min-height: 900px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
                                                 loading="eager"
+                                                sandbox="allow-scripts allow-same-origin"
                                                 allowfullscreen></iframe>
+                                        
+                                        <!-- Fallback link for dashboard -->
+                                        <div class="mt-3">
+                                            <a href="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                               target="_blank" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                Open dashboard in new tab
+                                            </a>
+                                        </div>
                                     </div>
                                     {% else %}
                                     <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
@@ -545,9 +550,19 @@
                                                 <iframe src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
                                                         title="{{ chart.name }}"
                                                         class="w-100"
-                                                        style="height: 700px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
-                                                        loading="eager"
+                                                        style="height: 700px; min-height: 700px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
+                                                        loading="lazy"
+                                                        sandbox="allow-scripts allow-same-origin"
                                                         allowfullscreen></iframe>
+                                                
+                                                <!-- Monte Carlo fallback link -->
+                                                <div class="mt-2">
+                                                    <a href="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                       target="_blank" 
+                                                       class="btn btn-sm btn-outline-primary">
+                                                        Open in new tab
+                                                    </a>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -748,9 +763,20 @@
                                                         <iframe src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
                                                                 title="{{ chart.name }}"
                                                                 class="w-100"
-                                                                style="height: 700px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
+                                                                style="height: 700px; min-height: 700px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
                                                                 loading="lazy"
+                                                                sandbox="allow-scripts allow-same-origin"
                                                                 allowfullscreen></iframe>
+                                                        
+                                                        <!-- Fallback link for debugging -->
+                                                        <div class="mt-3">
+                                                            <a href="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                               target="_blank" 
+                                                               class="btn btn-sm btn-outline-primary">
+                                                                Open visualization in new tab
+                                                            </a>
+                                                            <p class="small mt-2 text-muted">Path: {{ chart.path }}</p>
+                                                        </div>
                                                     </div>
                                                     {% else %}
                                                     <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
@@ -764,6 +790,17 @@
                                             {% endfor %}
                                         </div>
                                     </div>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info mb-4">
+                                    <h5>No Visualizations Available</h5>
+                                    <p>No visualization files were found for this walkforward analysis. This might be because:</p>
+                                    <ul>
+                                        <li>The walkforward analysis is still running</li>
+                                        <li>The "plot" option was not enabled during the analysis</li>
+                                        <li>There was an error generating the visualization files</li>
+                                    </ul>
+                                    <p>Check the logs for more information.</p>
                                 </div>
                                 {% endif %}
                                 
@@ -842,7 +879,15 @@
                                                                                                     class="w-100"
                                                                                                     style="height: 400px; border: none; border-radius: 4px; overflow: hidden; background-color: white;"
                                                                                                     loading="lazy"
+                                                                                                    sandbox="allow-scripts allow-same-origin"
                                                                                                     allowfullscreen></iframe>
+                                                                                            
+                                                                                            <!-- Window chart fallback link -->
+                                                                                            <a href="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
+                                                                                               target="_blank" 
+                                                                                               class="btn btn-sm btn-outline-primary mt-2">
+                                                                                                Open in new tab
+                                                                                            </a>
                                                                                         </div>
                                                                                         {% else %}
                                                                                         <img src="{{ url_for('serve_file', file_path=chart.path.replace(project_root, '').lstrip('/')) }}" 
@@ -975,6 +1020,61 @@
                         tabInstance.show();
                     }, 100);
                 }
+            }
+            
+            // Set up tab activation event listeners for Walk Forward section
+            const wfTab = document.getElementById('walk-forward-tab');
+            if (wfTab) {
+                // Listen for tab activation to ensure iframes are properly loaded
+                wfTab.addEventListener('shown.bs.tab', function () {
+                    // Force reload of all iframes when the Walk Forward tab becomes visible
+                    setTimeout(() => {
+                        console.log("Walk Forward tab activated - reloading iframes");
+                        const wfIframes = document.querySelectorAll('#walk-forward .visualization-frame iframe');
+                        wfIframes.forEach(iframe => {
+                            // Reload the iframe content with a timestamp to avoid caching
+                            const currentSrc = iframe.src;
+                            const refreshUrl = currentSrc.includes('?') 
+                                ? currentSrc + '&_refresh=' + new Date().getTime() 
+                                : currentSrc + '?_refresh=' + new Date().getTime();
+                            console.log("Reloading iframe: " + refreshUrl);
+                            iframe.src = refreshUrl;
+                        });
+                    }, 100);
+                });
+                
+                // Activate Walk Forward tab on page load if requested via URL hash
+                if (location.hash === '#walk-forward') {
+                    setTimeout(() => {
+                        const tabInstance = new bootstrap.Tab(wfTab);
+                        tabInstance.show();
+                    }, 100);
+                }
+                
+                // Handle visualization tab changes within walk forward
+                const wfVisTabs = document.querySelectorAll('#wfVisualizationTabs .nav-link');
+                wfVisTabs.forEach(tab => {
+                    tab.addEventListener('shown.bs.tab', function(event) {
+                        // Get the target pane
+                        const targetId = this.getAttribute('data-bs-target');
+                        const targetPane = document.querySelector(targetId);
+                        
+                        if (targetPane) {
+                            const iframe = targetPane.querySelector('iframe');
+                            if (iframe) {
+                                // Reload iframe content when tab is activated
+                                setTimeout(() => {
+                                    console.log("Reloading iframe for visualization tab: " + targetId);
+                                    const currentSrc = iframe.src;
+                                    const refreshUrl = currentSrc.includes('?') 
+                                        ? currentSrc + '&_refresh=' + new Date().getTime() 
+                                        : currentSrc + '?_refresh=' + new Date().getTime();
+                                    iframe.src = refreshUrl;
+                                }, 50);
+                            }
+                        }
+                    });
+                });
             }
             
             // Dark mode functionality
